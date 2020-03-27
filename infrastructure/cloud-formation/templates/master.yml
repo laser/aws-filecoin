@@ -1,0 +1,41 @@
+Description: >
+  This template deploys a VPC.
+
+Parameters:
+  EC2KeyName:
+    Description: AWS key pair name for connecting to EC2 instances
+    Type: AWS::EC2::KeyPair::KeyName
+  S3TemplateKeyPrefix:
+    Description: >
+      An S3 key prefix which will be used to resolve referenced templates
+    Type: String
+
+Resources:
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${S3TemplateKeyPrefix}security-groups.yml
+      Parameters:
+        EnvironmentName: !Ref AWS::StackName
+        VPC: !GetAtt Network.Outputs.VPC
+  EC2Instances:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${S3TemplateKeyPrefix}ec2-instances.yml
+      Parameters:
+        AvailabilityZone: !Select [ 0, !GetAZs ]
+        EnvironmentName: !Ref AWS::StackName
+        KeyName: !Ref EC2KeyName
+        SecurityGroup: !GetAtt SecurityGroups.Outputs.EC2InstancesSecurityGroup
+        Subnet: !GetAtt Network.Outputs.PublicSubnet1
+        VPC: !GetAtt Network.Outputs.VPC
+  Network:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${S3TemplateKeyPrefix}network.yml
+      Parameters:
+        AvailabilityZone:   !Select [ 0, !GetAZs ]
+        EnvironmentName:    !Ref AWS::StackName
+        VpcCIDR:            10.0.0.0/16
+        PublicSubnet1CIDR:  10.0.10.0/26 # 64 addresses
+

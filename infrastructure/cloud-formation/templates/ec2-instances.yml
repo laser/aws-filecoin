@@ -1,0 +1,92 @@
+Description: >
+  This template contains the security groups required by our entire stack.
+
+Parameters:
+  AvailabilityZone:
+    Description: Availability zone to deploy
+    Type: AWS::EC2::AvailabilityZone::Name
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  KeyName:
+    Description: AWS key pair name for connecting to EC2 instances
+    Type: AWS::EC2::KeyPair::KeyName
+  SecurityGroup:
+    Description: Security group ID for EC2 instance network interfaces
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnet:
+    Description: Subnet ID for EC2 instance network interfaces
+    Type: AWS::EC2::Subnet::Id
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Choose which VPC the security groups should be deployed to
+
+Resources:
+  StorageMinerEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+#      AdditionalInfo: String
+#      Affinity: String
+      AvailabilityZone: !Ref AvailabilityZone
+#      BlockDeviceMappings:
+#        - BlockDeviceMapping
+#      CpuOptions:
+#        CpuOptions
+#      CreditSpecification:
+#        CreditSpecification
+#      DisableApiTermination: Boolean
+#      EbsOptimized: Boolean
+#      ElasticGpuSpecifications:
+#        - ElasticGpuSpecification
+#      ElasticInferenceAccelerators:
+#        - ElasticInferenceAccelerator
+#      HibernationOptions:
+#        HibernationOptions
+#      HostId: String
+#      HostResourceGroupArn: String
+#      IamInstanceProfile: String
+      # see: https://cloud-images.ubuntu.com/query/disco/server/released.current.txt
+      ImageId: "ami-06a0ea768526e5631"
+#      InstanceInitiatedShutdownBehavior: String
+      InstanceType: "m4.xlarge"
+#      Ipv6AddressCount: Integer
+#      Ipv6Addresses:
+#        - InstanceIpv6Address
+#      KernelId: String
+      KeyName: !Ref KeyName
+#      LaunchTemplate:
+#        LaunchTemplateSpecification
+#      LicenseSpecifications:
+#        - LicenseSpecification
+#      Monitoring: Boolean
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref Subnet
+          GroupSet:
+            - !Ref SecurityGroup
+#      PlacementGroupName: String
+#      PrivateIpAddress: String
+#      RamdiskId: String
+#      SecurityGroupIds:
+#        - String
+#      SecurityGroups:
+#        - String
+#      SourceDestCheck: Boolean
+#      SsmAssociations:
+#        - SsmAssociation
+#      SubnetId: String
+#      Tags:
+#        - Tag
+#      Tenancy: String
+#      UserData: String
+#      Volumes:
+#        - Volume
+#
+Outputs:
+  StorageMinerEC2Instance:
+    Description: Storage mining EC2 instance ID
+    Value: !Ref StorageMinerEC2Instance
+  StorageMinerEC2InstanceIP:
+    Description: IP Address for storage mining EC2 instance
+    Value: !GetAtt StorageMinerEC2Instance.PublicIp
