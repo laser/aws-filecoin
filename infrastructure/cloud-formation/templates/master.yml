@@ -1,10 +1,13 @@
 Description: >
-  This template deploys a VPC.
+  This template deploys a VPC containing a single EC2 instance.
 
 Parameters:
   EC2KeyName:
     Description: AWS key pair name for connecting to EC2 instances
     Type: AWS::EC2::KeyPair::KeyName
+  LotusGitSHA:
+    Description: Git SHA of lotus to build
+    Type: String
   S3TemplateKeyPrefix:
     Description: >
       An S3 key prefix which will be used to resolve referenced templates
@@ -26,6 +29,7 @@ Resources:
         AvailabilityZone: !Select [ 0, !GetAZs ]
         EnvironmentName: !Ref AWS::StackName
         KeyName: !Ref EC2KeyName
+        LotusGitSHA: !Ref LotusGitSHA
         SecurityGroup: !GetAtt SecurityGroups.Outputs.EC2InstancesSecurityGroup
         Subnet: !GetAtt Network.Outputs.PublicSubnet1
         VPC: !GetAtt Network.Outputs.VPC
@@ -39,3 +43,7 @@ Resources:
         VpcCIDR:            10.0.0.0/16
         PublicSubnet1CIDR:  10.0.10.0/26 # 64 addresses
 
+Outputs:
+  StorageMinerEC2Instance:
+    Description: IP Address for storage mining EC2 instance
+    Value: !GetAtt EC2Instances.Outputs.StorageMinerEC2InstanceIP

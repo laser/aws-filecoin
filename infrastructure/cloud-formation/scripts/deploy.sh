@@ -10,6 +10,7 @@ main() {
   local region=$1
   local env_name=$2
   local ec2_key_name=$3
+  local lotus_git_sha=$4
   local bucket_stack_name="${env_name}-template-storage"
 
   # Create an S3 stack which holds our CloudFormation templates and an ECR stack
@@ -22,7 +23,7 @@ main() {
       --region "${region}" \
       --stack-name "${bucket_stack_name}" \
       --template-file ../templates/template-storage.yml \
-      --parameter-overrides BucketName="${env_name}"
+      --parameter-overrides BucketName="${env_name}" || exit 1
   fi
 
   # Ensure that S3 has the most recent revision of our CloudFormation templates
@@ -33,12 +34,10 @@ main() {
     --region "${region}" \
     --acl public-read \
     --delete \
-    ../templates/ "s3://${env_name}/infrastructure/cloud-formation/templates/"
+    ../templates/ "s3://${env_name}/infrastructure/cloud-formation/templates/" || exit 1
 
-  # Create the stack
+  # Create (or update) the stack
   #
-  (>&2 echo '[deploy/main] creating main CloudFormation stack')
-
   aws cloudformation deploy \
     --region "${region}" \
     --stack-name "${env_name}" \
@@ -46,9 +45,10 @@ main() {
     --template-file ../templates/master.yml \
     --parameter-overrides \
     S3TemplateKeyPrefix="https://s3.amazonaws.com/${env_name}/infrastructure/cloud-formation/templates/" \
-    EC2KeyName="${ec2_key_name}"
+    LotusGitSHA="${lotus_git_sha}" \
+    EC2KeyName="${ec2_key_name}" || exit 1
 
-  echo "$(date):create:${env_name}:success"
+  aws cloudformation describe-stacks --stack-name "${env_name}" --region "${region}" | jq '.Stacks[].Outputs'
 }
 
 main "$@"; exit

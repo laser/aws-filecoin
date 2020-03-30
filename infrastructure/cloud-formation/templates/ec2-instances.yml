@@ -1,5 +1,6 @@
 Description: >
-  This template contains the security groups required by our entire stack.
+  This template contains the EC2 instance on which we run our storage miner and
+  client.
 
 Parameters:
   AvailabilityZone:
@@ -11,6 +12,9 @@ Parameters:
   KeyName:
     Description: AWS key pair name for connecting to EC2 instances
     Type: AWS::EC2::KeyPair::KeyName
+  LotusGitSHA:
+    Description: Git SHA of lotus to build
+    Type: String
   SecurityGroup:
     Description: Security group ID for EC2 instance network interfaces
     Type: AWS::EC2::SecurityGroup::Id
@@ -79,7 +83,61 @@ Resources:
 #      Tags:
 #        - Tag
 #      Tenancy: String
-#      UserData: String
+      UserData: !Base64
+        'Fn::Sub': |
+          Content-Type: multipart/mixed; boundary="//"
+          MIME-Version: 1.0
+
+          --//
+          Content-Type: text/cloud-config; charset="us-ascii"
+          MIME-Version: 1.0
+          Content-Transfer-Encoding: 7bit
+          Content-Disposition: attachment; filename="cloud-config.txt"
+
+          #cloud-config
+          cloud_final_modules:
+          - [scripts-user, always]
+
+          --//
+          Content-Type: text/x-shellscript; charset="us-ascii"
+          MIME-Version: 1.0
+          Content-Transfer-Encoding: 7bit
+          Content-Disposition: attachment; filename="userdata.txt"
+
+          #!/bin/bash
+
+          set -x
+
+          GO_VERSION=1.13.9
+
+          # Install packages needed for libfilcrypto
+          apt-get update && apt-get install -y --no-install-recommends \
+            g++ \
+            libc6-dev \
+            ocl-icd-opencl-dev \
+            jq \
+            make && sudo rm -rf /var/lib/apt/lists/*
+
+          # Install Golang
+          curl -sSL "https://golang.org/dl/go$GO_VERSION.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+          chown -R ubuntu:ubuntu /usr/local/go
+          mkdir -p /home/ubuntu/go/bin
+          export GOPATH=/home/circleci/go
+          export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+
+          # Set GOPATH in .bashrc
+          echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
+          echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
+
+          # Build lotus
+          go get -u github.com/filecoin-project/lotus
+          cd $GOPATH/src/github.com/filecoin-project/lotus
+          git checkout ${LotusGitSHA}
+          make
+
+          # Clean up root's mess
+          chown -R ubuntu:ubuntu /home/ubuntu
+          --//
 #      Volumes:
 #        - Volume
 #
