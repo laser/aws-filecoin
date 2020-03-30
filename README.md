@@ -1,6 +1,6 @@
-# lotus-testing
+# aws-filecoin
 
-Run various storage mining tests on AWS
+Run some Filecoin nodes on AWS
 
 ## Use
 
