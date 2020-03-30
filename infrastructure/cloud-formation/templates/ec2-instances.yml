@@ -116,26 +116,21 @@ Resources:
             libc6-dev \
             ocl-icd-opencl-dev \
             jq \
-            make && sudo rm -rf /var/lib/apt/lists/*
+            pkg-config \
+            make && rm -rf /var/lib/apt/lists/*
 
           # Install Golang
-          curl -sSL "https://golang.org/dl/go$GO_VERSION.linux-amd64.tar.gz" | sudo tar -xz -C /usr/local/
+          curl -sSL "https://golang.org/dl/go$GO_VERSION.linux-amd64.tar.gz" | tar -xz -C /usr/local/
           chown -R ubuntu:ubuntu /usr/local/go
           mkdir -p /home/ubuntu/go/bin
-          export GOPATH=/home/circleci/go
+          export GOPATH=/home/ubuntu/go
           export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
           # Set GOPATH in .bashrc
           echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
           echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
 
-          # Build lotus
-          go get -u github.com/filecoin-project/lotus
-          cd $GOPATH/src/github.com/filecoin-project/lotus
-          git checkout ${LotusGitSHA}
-          make
-
-          # Clean up root's mess
+          # All of these commands are run as root; set proper owner here
           chown -R ubuntu:ubuntu /home/ubuntu
           --//
 #      Volumes:
