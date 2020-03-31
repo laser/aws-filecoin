@@ -11,9 +11,9 @@ bootstrap_daemon_port=$(free_port)
 bootstrap_miner_port=$(free_port)
 tmux_session="lotus-interop"
 tmux_window_bootstrap_daemon="daemon"
+tmux_window_bootstrap_faucet="faucet"
 tmux_window_bootstrap_miner="miner"
 tmux_window_tmp_setup="setup"
-tmux_window_bootstrap_faucet="faucet"
 genesis_miner_addr="t01000"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
 
