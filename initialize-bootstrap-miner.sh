@@ -13,6 +13,7 @@ tmux_session="lotus-interop"
 tmux_window_bootstrap_daemon="daemon"
 tmux_window_bootstrap_miner="miner"
 tmux_window_tmp_setup="setup"
+tmux_window_bootstrap_faucet="faucet"
 genesis_miner_addr="t01000"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
 
@@ -32,8 +33,8 @@ set -x
 SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 pushd \$SCRIPTDIR/../build
 pwd
-make clean deps debug lotus-shed
-cp lotus lotus-storage-miner lotus-shed lotus-seed ../bin/
+make clean deps debug lotus-shed fountain
+cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ../bin/
 popd
 EOF
 
@@ -72,9 +73,26 @@ lotus wallet import "${base_dir}/.genesis-sectors/pre-seal-${genesis_miner_addr}
 lotus-storage-miner init --genesis-miner --actor="${genesis_miner_addr}" --sector-size=2048 --pre-sealed-sectors=\$LOTUS_GENESIS_SECTORS --pre-sealed-metadata="\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.json" --nosync
 EOF
 
+cat > "${base_dir}/scripts/start_faucet.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+while [ ! -f \$LOTUS_PATH/api ]; do
+  sleep 5
+done
+
+while [ ! -f \$(lotus wallet list) ]; do
+  sleep 5
+done
+
+WALLET_ADDR=\$(lotus wallet list)
+fountain run --from=\$WALLET_ADDR
+EOF
+
 chmod +x "${base_dir}/scripts/build.bash"
 chmod +x "${base_dir}/scripts/create_genesis_block.bash"
 chmod +x "${base_dir}/scripts/create_miner.bash"
+chmod +x "${base_dir}/scripts/start_faucet.bash"
 
 # build various lotus binaries
 #
@@ -86,6 +104,7 @@ tmux new-session -d -s "$tmux_session" -n "$tmux_window_tmp_setup"
 tmux set-environment -t "$tmux_session" base_dir "$base_dir"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_daemon"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_miner"
+tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_faucet"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 
 case $(basename $SHELL) in
@@ -96,7 +115,8 @@ esac
 # ensure tmux sessions have identical environments
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"  "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 
 # create genesis block and run bootstrap daemon
 #
@@ -105,10 +125,14 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemo
 
 # start bootstrap miner
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"   "${base_dir}/scripts/create_miner.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"   "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "${base_dir}/scripts/create_miner.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+
+# start bootstrap faucet
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "${base_dir}/scripts/start_faucet.bash" C-m
 
 # select bootstrap daemon and view your handywork
 #
 tmux select-window -t "${tmux_session}:${tmux_window_bootstrap_daemon}"
-tmux attach-session -t $tmux_session
+tmux attach-session -t "${tmux_session}"
