@@ -29,16 +29,16 @@ mkdir -p "${base_dir}/bin"
 
 cat > "${base_dir}/scripts/env-bootstrap.fish" <<EOF
 set -x PATH ${base_dir}/bin \$PATH
-set -x LOTUS_PATH ${base_dir}/.lotus
-set -x LOTUS_STORAGE_PATH ${base_dir}/.lotusstorage
-set -x LOTUS_GENESIS_SECTORS \$base_dir/.genesis-sectors/
+set -x LOTUS_PATH ${base_dir}/.bootstrap-lotus
+set -x LOTUS_STORAGE_PATH ${base_dir}/.bootstrap-lotusstorage
+set -x LOTUS_GENESIS_SECTORS ${base_dir}/.genesis-sectors
 EOF
 
 cat > "${base_dir}/scripts/env-bootstrap.bash" <<EOF
 export PATH=${base_dir}/bin:\$PATH
-export LOTUS_PATH=${base_dir}/.lotus
-export LOTUS_STORAGE_PATH=${base_dir}/.lotusstorage
-export LOTUS_GENESIS_SECTORS=\$base_dir/.genesis-sectors/
+export LOTUS_PATH=${base_dir}/.bootstrap-lotus
+export LOTUS_STORAGE_PATH=${base_dir}/.bootstrap-lotusstorage
+export LOTUS_GENESIS_SECTORS=${base_dir}/.genesis-sectors
 EOF
 
 cat > "${base_dir}/scripts/build.bash" <<EOF
@@ -69,7 +69,8 @@ while [ ! -f \$LOTUS_PATH/api ]; do
   sleep 5
 done
 
-lotus wallet import "${base_dir}/.genesis-sectors/pre-seal-${genesis_miner_addr}.key"
+
+lotus wallet import "\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.key"
 lotus-storage-miner init --genesis-miner --actor="${genesis_miner_addr}" --sector-size=2048 --pre-sealed-sectors=\$LOTUS_GENESIS_SECTORS --pre-sealed-metadata="\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.json" --nosync
 EOF
 
