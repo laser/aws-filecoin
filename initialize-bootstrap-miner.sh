@@ -37,14 +37,14 @@ cp lotus lotus-storage-miner lotus-shed lotus-seed ../bin/
 popd
 EOF
 
-cat > "${base_dir}/scripts/env.fish" <<EOF
+cat > "${base_dir}/scripts/env-bootstrap.fish" <<EOF
 set -x PATH ${base_dir}/bin \$PATH
 set -x LOTUS_PATH ${base_dir}/.lotus
 set -x LOTUS_STORAGE_PATH ${base_dir}/.lotusstorage
 set -x LOTUS_GENESIS_SECTORS \$base_dir/.genesis-sectors/
 EOF
 
-cat > "${base_dir}/scripts/env.bash" <<EOF
+cat > "${base_dir}/scripts/env-bootstrap.bash" <<EOF
 export PATH=${base_dir}/bin:\$PATH
 export LOTUS_PATH=${base_dir}/.lotus
 export LOTUS_STORAGE_PATH=${base_dir}/.lotusstorage
@@ -95,8 +95,8 @@ esac
 
 # ensure tmux sessions have identical environments
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "source ${base_dir}/scripts/env.$shell" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"  "source ${base_dir}/scripts/env.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"  "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 
 # create genesis block and run bootstrap daemon
 #
