@@ -2,8 +2,13 @@
 
 set -Exo pipefail
 
-lotus_git_sha=$1
+free_port() {
+  python -c "import socket; s = socket.socket(); s.bind(('', 0)); print(s.getsockname()[1])"
+}
 
+lotus_git_sha=$1
+bootstrap_daemon_port=$(free_port)
+bootstrap_miner_port=$(free_port)
 tmux_session="lotus-interop"
 tmux_window_bootstrap_daemon="daemon"
 tmux_window_bootstrap_miner="miner"
@@ -96,12 +101,12 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"  "source ${ba
 # create genesis block and run bootstrap daemon
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "${base_dir}/scripts/create_genesis_block.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemon --lotus-make-genesis=${base_dir}/dev.gen --genesis-template=${base_dir}/localnet.json --bootstrap=false 2>&1 | tee -a ${base_dir}/daemon.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemon --lotus-make-genesis=${base_dir}/dev.gen --genesis-template=${base_dir}/localnet.json --bootstrap=false --api=${bootstrap_daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
 
 # start bootstrap miner
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"   "${base_dir}/scripts/create_miner.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"   "lotus-storage-miner run --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}"   "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
 
 # select bootstrap daemon and view your handywork
 #
