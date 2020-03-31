@@ -27,17 +27,6 @@ pushd "${base_dir}/build" && git reset --hard "${lotus_git_sha}" && popd
 mkdir -p "${base_dir}/scripts"
 mkdir -p "${base_dir}/bin"
 
-cat > "${base_dir}/scripts/build.bash" <<EOF
-#!/usr/bin/env bash
-set -x
-SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-pushd \$SCRIPTDIR/../build
-pwd
-make clean deps debug lotus-shed fountain
-cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ../bin/
-popd
-EOF
-
 cat > "${base_dir}/scripts/env-bootstrap.fish" <<EOF
 set -x PATH ${base_dir}/bin \$PATH
 set -x LOTUS_PATH ${base_dir}/.lotus
@@ -50,6 +39,17 @@ export PATH=${base_dir}/bin:\$PATH
 export LOTUS_PATH=${base_dir}/.lotus
 export LOTUS_STORAGE_PATH=${base_dir}/.lotusstorage
 export LOTUS_GENESIS_SECTORS=\$base_dir/.genesis-sectors/
+EOF
+
+cat > "${base_dir}/scripts/build.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+pushd \$SCRIPTDIR/../build
+pwd
+make clean deps debug lotus-shed fountain
+cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ../bin/
+popd
 EOF
 
 cat > "${base_dir}/scripts/create_genesis_block.bash" <<EOF
