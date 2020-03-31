@@ -9,7 +9,10 @@ free_port() {
 lotus_git_sha=$1
 bootstrap_daemon_port=$(free_port)
 bootstrap_miner_port=$(free_port)
+client_daemon_port=$(free_port)
 tmux_session="lotus-interop"
+tmux_window_client_daemon="clientdaemon"
+tmux_window_client_cli="clientcli"
 tmux_window_bootstrap_daemon="daemon"
 tmux_window_bootstrap_faucet="faucet"
 tmux_window_bootstrap_miner="miner"
@@ -39,6 +42,18 @@ export PATH=${base_dir}/bin:\$PATH
 export LOTUS_PATH=${base_dir}/.bootstrap-lotus
 export LOTUS_STORAGE_PATH=${base_dir}/.bootstrap-lotusstorage
 export LOTUS_GENESIS_SECTORS=${base_dir}/.genesis-sectors
+EOF
+
+cat > "${base_dir}/scripts/env-client.fish" <<EOF
+set -x PATH ${base_dir}/bin \$PATH
+set -x LOTUS_PATH ${base_dir}/.client-lotus
+set -x LOTUS_STORAGE_PATH ${base_dir}/.client-lotusstorage
+EOF
+
+cat > "${base_dir}/scripts/env-client.bash" <<EOF
+export PATH=${base_dir}/bin:\$PATH
+export LOTUS_PATH=${base_dir}/.client-lotus
+export LOTUS_STORAGE_PATH=${base_dir}/.client-lotusstorage
 EOF
 
 cat > "${base_dir}/scripts/build.bash" <<EOF
@@ -104,8 +119,10 @@ bash "${base_dir}/scripts/build.bash"
 tmux new-session -d -s "$tmux_session" -n "$tmux_window_tmp_setup"
 tmux set-environment -t "$tmux_session" base_dir "$base_dir"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_daemon"
-tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_miner"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_faucet"
+tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_miner"
+tmux new-window -t "$tmux_session" -n "$tmux_window_client_cli"
+tmux new-window -t "$tmux_session" -n "$tmux_window_client_daemon"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 
 case $(basename $SHELL) in
@@ -118,6 +135,8 @@ esac
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "source ${base_dir}/scripts/env-client.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "source ${base_dir}/scripts/env-client.$shell" C-m
 
 # create genesis block and run bootstrap daemon
 #
@@ -133,7 +152,12 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus-storag
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "${base_dir}/scripts/start_faucet.bash" C-m
 
-# select bootstrap daemon and view your handywork
+# start client daemon
 #
-tmux select-window -t "${tmux_session}:${tmux_window_bootstrap_daemon}"
+sleep 5
+tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "lotus daemon --genesis=${base_dir}/dev.gen --bootstrap=false --api=${client_daemon_port} 2>&1 | tee -a ${base_dir}/client.log" C-m
+
+# select a window and view your handywork
+#
+tmux select-window -t "${tmux_session}:${tmux_window_client_daemon}"
 tmux attach-session -t "${tmux_session}"
