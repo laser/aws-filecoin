@@ -72,12 +72,14 @@ export LOTUS_GENESIS_SECTORS=${base_dir}/.genesis-sectors
 EOF
 
 cat > "${base_dir}/scripts/env-client.fish" <<EOF
+set -x RUST_LOG info
 set -x PATH ${base_dir}/bin \$PATH
 set -x LOTUS_PATH ${base_dir}/.client-lotus
 set -x LOTUS_STORAGE_PATH ${base_dir}/.client-lotusstorage
 EOF
 
 cat > "${base_dir}/scripts/env-client.bash" <<EOF
+export RUST_LOG=info
 export PATH=${base_dir}/bin:\$PATH
 export LOTUS_PATH=${base_dir}/.client-lotus
 export LOTUS_STORAGE_PATH=${base_dir}/.client-lotusstorage
@@ -216,6 +218,12 @@ tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${ba
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect \$(cat ${base_dir}/.bootstrap-multiaddr)" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
+
+# create a storage deal
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 1016 | head -n 1 > ${base_dir}/wombat.txt" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus client import ${base_dir}/wombat.txt > ${base_dir}/wombat.cid" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus client deal \$(cat ${base_dir}/wombat.cid) t01000 0.000000000001 5" C-m
 
 # select a window and view your handywork
 #
