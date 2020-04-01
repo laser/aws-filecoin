@@ -46,6 +46,7 @@ tmux_window_client_cli="clientcli"
 tmux_window_bootstrap_daemon="daemon"
 tmux_window_bootstrap_faucet="faucet"
 tmux_window_bootstrap_miner="miner"
+tmux_window_bootstrap_cli="minercli"
 tmux_window_tmp_setup="setup"
 genesis_miner_addr="t01000"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
@@ -112,6 +113,7 @@ set -x
 HOME="${base_dir}" lotus-seed pre-seal --sector-size 2048 --num-sectors 2 --miner-addr "${genesis_miner_addr}"
 lotus-seed genesis new "${base_dir}/localnet.json"
 lotus-seed genesis add-miner "${base_dir}/localnet.json" "\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.json"
+jq '.Accounts[0].Balance = "1234567890123456789"' "${base_dir}/localnet.json" > "${base_dir}/localnet.json.tmp" && mv "${base_dir}/localnet.json.tmp" "${base_dir}/localnet.json"
 EOF
 
 cat > "${base_dir}/scripts/create_miner.bash" <<EOF
@@ -162,6 +164,7 @@ tmux set-environment -t "$tmux_session" base_dir "$base_dir"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_daemon"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_faucet"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_miner"
+tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_cli"
 tmux new-window -t "$tmux_session" -n "$tmux_window_client_cli"
 tmux new-window -t "$tmux_session" -n "$tmux_window_client_daemon"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
@@ -176,6 +179,7 @@ esac
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "source ${base_dir}/scripts/env-client.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "source ${base_dir}/scripts/env-client.$shell" C-m
 
@@ -184,10 +188,14 @@ tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "source ${base_dir
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "${base_dir}/scripts/create_genesis_block.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemon --lotus-make-genesis=${base_dir}/dev.gen --genesis-template=${base_dir}/localnet.json --bootstrap=false --api=${bootstrap_daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
 
+# dump multiaddr for networking client and miner daemons
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "lotus net listen | grep 127 > ${base_dir}/.bootstrap-multiaddr" C-m
+
 # start bootstrap miner
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus net listen | grep 127 > ${base_dir}/.bootstrap-multiaddr" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "${base_dir}/scripts/create_miner.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
 
