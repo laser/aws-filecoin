@@ -85,9 +85,7 @@ cat > "${base_dir}/scripts/create_miner.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-while [ ! -f \$LOTUS_PATH/api ]; do
-  sleep 5
-done
+while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done
 
 lotus wallet import "\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.key"
 lotus-storage-miner init --genesis-miner --actor="${genesis_miner_addr}" --sector-size=2048 --pre-sealed-sectors=\$LOTUS_GENESIS_SECTORS --pre-sealed-metadata="\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.json" --nosync
@@ -97,9 +95,7 @@ cat > "${base_dir}/scripts/start_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-while [ ! -f \$LOTUS_PATH/api ]; do
-  sleep 5
-done
+while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done
 
 wallet=\$(lotus wallet list)
 while [ "\$wallet" = "" ]; do
