@@ -209,7 +209,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "${base_dir}
 tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "while [ ! -f ${base_dir}/dev.gen ]; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "lotus daemon --genesis=${base_dir}/dev.gen --bootstrap=false --api=${client_daemon_port} 2>&1 | tee -a ${base_dir}/client.log" C-m
 
-# hit the faucet (after networking two nodes)
+# client hits the faucet (after networking two nodes)
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 ${client_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${base_dir}/.bootstrap-multiaddr ]; do sleep 5; done" C-m
