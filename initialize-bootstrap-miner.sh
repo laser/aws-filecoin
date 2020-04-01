@@ -6,6 +6,11 @@ free_port() {
   python -c "import socket; s = socket.socket(); s.bind(('', 0)); print(s.getsockname()[1])"
 }
 
+if [ -z "$1" ]; then
+    (>&2 echo "lotus Git SHA required")
+    exit 1
+fi
+
 lotus_git_sha=$1
 bootstrap_daemon_port=$(free_port)
 bootstrap_miner_port=$(free_port)
