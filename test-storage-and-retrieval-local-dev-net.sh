@@ -1,16 +1,51 @@
 #!/usr/bin/env bash
 
+# USAGE:
+#
+# Option 1: Build and run tests using specific lotus Git SHA:
+#
+# > ./test-storage-and-retrieval-local-dev-net.sh --lotus-git-sha=a249aea9c444cde2bd9039bce68a26bc51aa7681
+#
+# Option 2: Build and run using binaries you've built previously (much faster)
+#
+# > cd $LOTUS_CHECKOUT_DIR && make clean deps debug lotus-shed fountain
+# > ./test-storage-and-retrieval-local-dev-net.sh --copy-binaries-from-dir=$LOTUS_CHECKOUT_DIR
+#
+
 set -Exo pipefail
 
 free_port() {
-  python -c "import socket; s = socket.socket(); s.bind(('', 0)); print(s.getsockname()[1])"
+    python -c "import socket; s = socket.socket(); s.bind(('', 0)); print(s.getsockname()[1])"
 }
 
+bootstrap_daemon_port=$(free_port)
+bootstrap_miner_port=$(free_port)
+client_daemon_port=$(free_port)
+tmux_session="lotus-interop"
+tmux_window_client_daemon="clientdaemon"
+tmux_window_client_cli="clientcli"
+tmux_window_bootstrap_daemon="daemon"
+tmux_window_bootstrap_faucet="faucet"
+tmux_window_bootstrap_miner="miner"
+tmux_window_bootstrap_cli="minercli"
+tmux_window_tmp_setup="setup"
+genesis_miner_addr="t01000"
+base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
+deps=(printf paste jq python nc)
 lotus_git_sha=""
 copy_binaries_from_dir=""
 other_args=()
 
-# Loop through arguments and process them
+# ensure that script dependencies are met
+#
+for dep in ${deps[@]}; do
+    if ! which "${dep}"; then
+        (>&2 echo "please install ${dep} before running this script")
+        exit 1
+    fi
+done
+
+# grab shell arguments (see USAGE)
 #
 for arg in "$@"
 do
@@ -37,20 +72,6 @@ if [[ -z "$lotus_git_sha" ]]; then
     fi
 fi
 
-bootstrap_daemon_port=$(free_port)
-bootstrap_miner_port=$(free_port)
-client_daemon_port=$(free_port)
-tmux_session="lotus-interop"
-tmux_window_client_daemon="clientdaemon"
-tmux_window_client_cli="clientcli"
-tmux_window_bootstrap_daemon="daemon"
-tmux_window_bootstrap_faucet="faucet"
-tmux_window_bootstrap_miner="miner"
-tmux_window_bootstrap_cli="minercli"
-tmux_window_tmp_setup="setup"
-genesis_miner_addr="t01000"
-base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
-
 # create some directories which we'll need later
 #
 mkdir -p "${base_dir}"
@@ -58,6 +79,7 @@ mkdir -p "${base_dir}/scripts"
 mkdir -p "${base_dir}/bin"
 
 cat > "${base_dir}/scripts/env-bootstrap.fish" <<EOF
+set -x RUST_LOG info
 set -x PATH ${base_dir}/bin \$PATH
 set -x LOTUS_PATH ${base_dir}/.bootstrap-lotus
 set -x LOTUS_STORAGE_PATH ${base_dir}/.bootstrap-lotusstorage
@@ -65,6 +87,7 @@ set -x LOTUS_GENESIS_SECTORS ${base_dir}/.genesis-sectors
 EOF
 
 cat > "${base_dir}/scripts/env-bootstrap.bash" <<EOF
+export RUST_LOG=info
 export PATH=${base_dir}/bin:\$PATH
 export LOTUS_PATH=${base_dir}/.bootstrap-lotus
 export LOTUS_STORAGE_PATH=${base_dir}/.bootstrap-lotusstorage
@@ -103,7 +126,7 @@ if [[ ! -z "${lotus_git_sha}" ]]; then
     pushd \$SCRIPTDIR/../build
     pwd
     make clean deps debug lotus-shed fountain
-    cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ../bin/
+    cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ${base_dir}/bin/
     popd
 fi
 EOF
@@ -163,7 +186,13 @@ cat > "${base_dir}/scripts/retrieve_stored_file.bash" <<EOF
 set -x
 
 lotus client retrieve \$(cat "${base_dir}/original-data.cid") "${base_dir}/retrieved-data.txt"
-diff "${base_dir}/original-data.txt" "${base_dir}/retrieved-data.txt"
+
+set +x
+
+paste <(printf "%-50s\n\n" "${base_dir}/original-data.txt") <(printf "%-50s\n\n" "${base_dir}/retrieved-data.txt")
+paste <(printf %s "\$(cat "${base_dir}/original-data.txt" | fold -s -w 50)") <(printf %s "\$(cat "${base_dir}/retrieved-data.txt" | fold -s -w 50)")
+
+diff "${base_dir}/original-data.txt" "${base_dir}/retrieved-data.txt" && echo "retrieved file matches stored file"
 EOF
 
 chmod +x "${base_dir}/scripts/build.bash"
