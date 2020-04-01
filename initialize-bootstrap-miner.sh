@@ -149,11 +149,30 @@ msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" \$faucet/s
 lotus state wait-msg \$msg_cid
 EOF
 
+cat > "${base_dir}/scripts/propose_storage_deal.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 1016 | head -n 1 > "${base_dir}/original-data.txt"
+lotus client import "${base_dir}/original-data.txt" > "${base_dir}/original-data.cid"
+lotus client deal \$(cat ${base_dir}/original-data.cid) t01000 0.000000000001 5
+EOF
+
+cat > "${base_dir}/scripts/retrieve_stored_file.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+lotus client retrieve \$(cat "${base_dir}/original-data.cid") "${base_dir}/retrieved-data.txt"
+diff "${base_dir}/original-data.txt" "${base_dir}/retrieved-data.txt"
+EOF
+
 chmod +x "${base_dir}/scripts/build.bash"
 chmod +x "${base_dir}/scripts/create_genesis_block.bash"
 chmod +x "${base_dir}/scripts/create_miner.bash"
-chmod +x "${base_dir}/scripts/start_faucet.bash"
 chmod +x "${base_dir}/scripts/hit_faucet.bash"
+chmod +x "${base_dir}/scripts/propose_storage_deal.bash"
+chmod +x "${base_dir}/scripts/retrieve_stored_file.bash"
+chmod +x "${base_dir}/scripts/start_faucet.bash"
 
 # build various lotus binaries
 #
@@ -219,11 +238,14 @@ tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
 
-# create a storage deal
+# propose a storage deal
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 1016 | head -n 1 > ${base_dir}/wombat.txt" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus client import ${base_dir}/wombat.txt > ${base_dir}/wombat.cid" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus client deal \$(cat ${base_dir}/wombat.cid) t01000 0.000000000001 5" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/propose_storage_deal.bash" C-m
+
+# retrieve data and be overjoyed
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! lotus client list-deals | grep StorageDealActive; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/retrieve_stored_file.bash" C-m
 
 # select a window and view your handywork
 #
