@@ -6,12 +6,36 @@ free_port() {
   python -c "import socket; s = socket.socket(); s.bind(('', 0)); print(s.getsockname()[1])"
 }
 
-if [ -z "$1" ]; then
-    (>&2 echo "lotus Git SHA required")
-    exit 1
+lotus_git_sha=""
+copy_binaries_from_dir=""
+other_args=()
+
+# Loop through arguments and process them
+for arg in "$@"
+do
+    case $arg in
+        --lotus-git-sha=*)
+        lotus_git_sha="${arg#*=}"
+        shift
+        ;;
+        --copy-binaries-from-dir=*)
+        copy_binaries_from_dir="${arg#*=}"
+        shift
+        ;;
+        *)
+        other_args+=("$1")
+        shift # Remove generic argument from processing
+        ;;
+    esac
+done
+
+if [[ -z "$lotus_git_sha" ]]; then
+    if [[ -z "$copy_binaries_from_dir" ]]; then
+        (>&2 echo "must provide either --lotus-git-sha or --copy-binaries-from-dir")
+        exit 1
+    fi
 fi
 
-lotus_git_sha=$1
 bootstrap_daemon_port=$(free_port)
 bootstrap_miner_port=$(free_port)
 client_daemon_port=$(free_port)
@@ -25,13 +49,9 @@ tmux_window_tmp_setup="setup"
 genesis_miner_addr="t01000"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
 
-# set proper Git SHA
-#
-git clone https://github.com/filecoin-project/lotus.git "${base_dir}/build"
-pushd "${base_dir}/build" && git reset --hard "${lotus_git_sha}" && popd
-
 # create some directories which we'll need later
 #
+mkdir -p "${base_dir}"
 mkdir -p "${base_dir}/scripts"
 mkdir -p "${base_dir}/bin"
 
@@ -64,12 +84,24 @@ EOF
 cat > "${base_dir}/scripts/build.bash" <<EOF
 #!/usr/bin/env bash
 set -x
-SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-pushd \$SCRIPTDIR/../build
-pwd
-make clean deps debug lotus-shed fountain
-cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ../bin/
-popd
+
+if [[ ! -z "${copy_binaries_from_dir}" ]]; then
+    pushd ${copy_binaries_from_dir}
+    cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ${base_dir}/bin/
+    popd
+fi
+
+if [[ ! -z "${lotus_git_sha}" ]]; then
+    git clone https://github.com/filecoin-project/lotus.git "${base_dir}/build"
+    pushd "${base_dir}/build" && git reset --hard "${lotus_git_sha}" && popd
+
+    SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+    pushd \$SCRIPTDIR/../build
+    pwd
+    make clean deps debug lotus-shed fountain
+    cp lotus lotus-storage-miner lotus-shed lotus-seed fountain ../bin/
+    popd
+fi
 EOF
 
 cat > "${base_dir}/scripts/create_genesis_block.bash" <<EOF
@@ -95,7 +127,7 @@ cat > "${base_dir}/scripts/start_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done
+while ! nc -z 127.0.0.1 ${bootstrap_miner_port} </dev/null; do sleep 5; done
 
 wallet=\$(lotus wallet list)
 while [ "\$wallet" = "" ]; do
