@@ -11,6 +11,7 @@ copy_binaries_from_dir=""
 other_args=()
 
 # Loop through arguments and process them
+#
 for arg in "$@"
 do
     case $arg in
@@ -117,8 +118,6 @@ cat > "${base_dir}/scripts/create_miner.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done
-
 lotus wallet import "\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.key"
 lotus-storage-miner init --genesis-miner --actor="${genesis_miner_addr}" --sector-size=2048 --pre-sealed-sectors=\$LOTUS_GENESIS_SECTORS --pre-sealed-metadata="\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.json" --nosync
 EOF
@@ -126,8 +125,6 @@ EOF
 cat > "${base_dir}/scripts/start_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
-
-while ! nc -z 127.0.0.1 ${bootstrap_miner_port} </dev/null; do sleep 5; done
 
 wallet=\$(lotus wallet list)
 while [ "\$wallet" = "" ]; do
@@ -141,8 +138,6 @@ EOF
 cat > "${base_dir}/scripts/hit_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
-
-while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done
 
 faucet="http://127.0.0.1:7777"
 owner=\$(lotus wallet new bls)
@@ -191,25 +186,27 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemo
 
 # start bootstrap miner
 #
-sleep 5
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus net listen | grep 127 > ${base_dir}/.bootstrap-multiaddr" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "${base_dir}/scripts/create_miner.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
 
 # start bootstrap faucet
 #
-sleep 5
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "while ! nc -z 127.0.0.1 ${bootstrap_miner_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "${base_dir}/scripts/start_faucet.bash" C-m
 
 # start client daemon
 #
-sleep 5
+tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "while [ ! -f ${base_dir}/dev.gen ]; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "lotus daemon --genesis=${base_dir}/dev.gen --bootstrap=false --api=${client_daemon_port} 2>&1 | tee -a ${base_dir}/client.log" C-m
 
 # hit the faucet (after networking two nodes)
 #
-sleep 5
-tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect $(cat ${base_dir}/.bootstrap-multiaddr)" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 ${client_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${base_dir}/.bootstrap-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect \$(cat ${base_dir}/.bootstrap-multiaddr)" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
 
 # select a window and view your handywork
