@@ -22,6 +22,7 @@ bootstrap_daemon_port=$(free_port)
 bootstrap_miner_port=$(free_port)
 client_daemon_port=$(free_port)
 genesis_server_port=$(free_port)
+faucet_port=$(free_port)
 tmux_session="lotus-interop"
 tmux_window_client_daemon="clientdaemon"
 tmux_window_client_cli="clientcli"
@@ -168,14 +169,14 @@ while [ "\$wallet" = "" ]; do
   wallet=\$(lotus wallet list)
 done
 
-fountain run --from=\$wallet
+fountain run --from=\$wallet --front=\$(ifconfig | grep -E "([0-9]{1,3}\.){3}[0-9]{1,3}" | grep -v 127.0.0.1 | awk '{ print \$2 }' | cut -f2 -d:):${faucet_port}
 EOF
 
 cat > "${base_dir}/scripts/hit_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-faucet="http://127.0.0.1:7777"
+faucet="http://127.0.0.1:${faucet_port}"
 owner=\$(lotus wallet new bls)
 msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" \$faucet/send | tail -1)
 lotus state wait-msg \$msg_cid
@@ -204,14 +205,28 @@ paste <(printf %s "\$(cat "${base_dir}/original-data.txt" | fold -s -w 50)") <(p
 diff "${base_dir}/original-data.txt" "${base_dir}/retrieved-data.txt" && echo "retrieved file matches stored file"
 EOF
 
+cat > "${base_dir}/scripts/dump_state.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+PUBLIC_IP=\$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4 || echo "127.0.0.1")
+
+printf "{ \"bootstrap_daemon_multiaddr\": \"%s\", \"bootstrap_storage_multiaddr\": \"%s\", \"faucet_url\": \"%s\", \"genesis_server_url\": \"%s\" }" \
+    \$(cat ${base_dir}/.storage-multiaddr | sed -En "s/127\.0\.0\.1/\${PUBLIC_IP}/p") \
+    \$(cat ${base_dir}/.bootstrap-multiaddr | sed -En "s/127\.0\.0\.1/\${PUBLIC_IP}/p") \
+    "http://\${PUBLIC_IP}:${faucet_port}" \
+    "http://\${PUBLIC_IP}:${genesis_server_port}" > /tmp/state.json
+EOF
+
 chmod +x "${base_dir}/scripts/build.bash"
 chmod +x "${base_dir}/scripts/create_genesis_block.bash"
 chmod +x "${base_dir}/scripts/create_miner.bash"
+chmod +x "${base_dir}/scripts/dump_state.bash"
 chmod +x "${base_dir}/scripts/hit_faucet.bash"
 chmod +x "${base_dir}/scripts/propose_storage_deal.bash"
 chmod +x "${base_dir}/scripts/retrieve_stored_file.bash"
-chmod +x "${base_dir}/scripts/start_faucet.bash"
 chmod +x "${base_dir}/scripts/serve_genesis_file.bash"
+chmod +x "${base_dir}/scripts/start_faucet.bash"
 
 # build various lotus binaries
 #
@@ -255,16 +270,18 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemo
 tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "${base_dir}/scripts/serve_genesis_file.bash" C-m
 
-# dump multiaddr for networking client and miner daemons
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "lotus net listen | grep 127 > ${base_dir}/.bootstrap-multiaddr" C-m
-
 # start bootstrap miner
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "${base_dir}/scripts/create_miner.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+
+# dump multiaddr sfor networking client and miner daemons
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "lotus net listen | grep 127 > ${base_dir}/.bootstrap-multiaddr" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "while ! nc -z 127.0.0.1 ${bootstrap_miner_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "lotus-storage-miner net listen | grep 127 > ${base_dir}/.storage-multiaddr" C-m
 
 # start bootstrap faucet
 #
@@ -280,9 +297,15 @@ tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "lotus daemon -
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 ${client_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${base_dir}/.bootstrap-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${base_dir}/.storage-multiaddr ]; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect \$(cat ${base_dir}/.bootstrap-multiaddr)" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect \$(cat ${base_dir}/.storage-multiaddr)" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 ${faucet_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
+
+# dump state
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/dump_state.bash" C-m
 
 # propose a storage deal
 #
