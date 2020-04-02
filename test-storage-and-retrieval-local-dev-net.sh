@@ -23,6 +23,7 @@ bootstrap_miner_port=$(free_port)
 client_daemon_port=$(free_port)
 genesis_server_port=$(free_port)
 faucet_port=$(free_port)
+faucet_ip=$(ifconfig | grep -E "([0-9]{1,3}\.){3}[0-9]{1,3}" | grep -v 127.0.0.1 | awk '{ print $2 }' | cut -f2 -d:)
 tmux_session="lotus-interop"
 tmux_window_client_daemon="clientdaemon"
 tmux_window_client_cli="clientcli"
@@ -169,14 +170,14 @@ while [ "\$wallet" = "" ]; do
   wallet=\$(lotus wallet list)
 done
 
-fountain run --from=\$wallet --front=\$(ifconfig | grep -E "([0-9]{1,3}\.){3}[0-9]{1,3}" | grep -v 127.0.0.1 | awk '{ print \$2 }' | cut -f2 -d:):${faucet_port}
+fountain run --from=\$wallet --front=${faucet_ip}:${faucet_port}
 EOF
 
 cat > "${base_dir}/scripts/hit_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-faucet="http://127.0.0.1:${faucet_port}"
+faucet="http://${faucet_ip}:${faucet_port}"
 owner=\$(lotus wallet new bls)
 msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" \$faucet/send | tail -1)
 lotus state wait-msg \$msg_cid
@@ -300,7 +301,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${ba
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while [ ! -f ${base_dir}/.storage-multiaddr ]; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect \$(cat ${base_dir}/.bootstrap-multiaddr)" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "lotus net connect \$(cat ${base_dir}/.storage-multiaddr)" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z 127.0.0.1 ${faucet_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "while ! nc -z ${faucet_ip} ${faucet_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
 
 # dump state
