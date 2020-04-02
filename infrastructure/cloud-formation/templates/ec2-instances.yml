@@ -52,7 +52,7 @@ Resources:
       # see: https://cloud-images.ubuntu.com/query/disco/server/released.current.txt
       ImageId: "ami-06a0ea768526e5631"
 #      InstanceInitiatedShutdownBehavior: String
-      InstanceType: "m4.xlarge"
+      InstanceType: "r5.large"
 #      Ipv6AddressCount: Integer
 #      Ipv6Addresses:
 #        - InstanceIpv6Address
