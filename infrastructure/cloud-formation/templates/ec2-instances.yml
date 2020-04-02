@@ -26,11 +26,9 @@ Parameters:
     Description: Choose which VPC the security groups should be deployed to
 
 Resources:
-  StorageMinerEC2Instance:
+  StorageMinerAlphaEC2Instance:
     Type: AWS::EC2::Instance
     Properties:
-#      AdditionalInfo: String
-#      Affinity: String
       AvailabilityZone: !Ref AvailabilityZone
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
@@ -38,57 +36,15 @@ Resources:
             VolumeSize: 30
             VolumeType: gp2
             DeleteOnTermination: true
-#      BlockDeviceMappings:
-#        - BlockDeviceMapping
-#      CpuOptions:
-#        CpuOptions
-#      CreditSpecification:
-#        CreditSpecification
-#      DisableApiTermination: Boolean
-#      EbsOptimized: Boolean
-#      ElasticGpuSpecifications:
-#        - ElasticGpuSpecification
-#      ElasticInferenceAccelerators:
-#        - ElasticInferenceAccelerator
-#      HibernationOptions:
-#        HibernationOptions
-#      HostId: String
-#      HostResourceGroupArn: String
-#      IamInstanceProfile: String
-      # see: https://cloud-images.ubuntu.com/query/disco/server/released.current.txt
       ImageId: "ami-06a0ea768526e5631"
-#      InstanceInitiatedShutdownBehavior: String
       InstanceType: "r5.large"
-#      Ipv6AddressCount: Integer
-#      Ipv6Addresses:
-#        - InstanceIpv6Address
-#      KernelId: String
       KeyName: !Ref KeyName
-#      LaunchTemplate:
-#        LaunchTemplateSpecification
-#      LicenseSpecifications:
-#        - LicenseSpecification
-#      Monitoring: Boolean
       NetworkInterfaces:
         - AssociatePublicIpAddress: "true"
           DeviceIndex: "0"
           SubnetId: !Ref Subnet
           GroupSet:
             - !Ref SecurityGroup
-#      PlacementGroupName: String
-#      PrivateIpAddress: String
-#      RamdiskId: String
-#      SecurityGroupIds:
-#        - String
-#      SecurityGroups:
-#        - String
-#      SourceDestCheck: Boolean
-#      SsmAssociations:
-#        - SsmAssociation
-#      SubnetId: String
-#      Tags:
-#        - Tag
-#      Tenancy: String
       UserData: !Base64
         'Fn::Sub': |
           Content-Type: multipart/mixed; boundary="//"
@@ -139,13 +95,85 @@ Resources:
           # All of these commands are run as root; set proper owner here
           chown -R ubuntu:ubuntu /home/ubuntu
           --//
-#      Volumes:
-#        - Volume
-#
+  GenesisNodeEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: !Ref AvailabilityZone
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 30
+            VolumeType: gp2
+            DeleteOnTermination: true
+      ImageId: "ami-06a0ea768526e5631"
+      InstanceType: "r5.large"
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref Subnet
+          GroupSet:
+            - !Ref SecurityGroup
+      UserData: !Base64
+        'Fn::Sub': |
+          Content-Type: multipart/mixed; boundary="//"
+          MIME-Version: 1.0
+
+          --//
+          Content-Type: text/cloud-config; charset="us-ascii"
+          MIME-Version: 1.0
+          Content-Transfer-Encoding: 7bit
+          Content-Disposition: attachment; filename="cloud-config.txt"
+
+          #cloud-config
+          cloud_final_modules:
+          - [scripts-user, always]
+
+          --//
+          Content-Type: text/x-shellscript; charset="us-ascii"
+          MIME-Version: 1.0
+          Content-Transfer-Encoding: 7bit
+          Content-Disposition: attachment; filename="userdata.txt"
+
+          #!/bin/bash
+
+          set -x
+
+          GO_VERSION=1.13.9
+
+          # Install packages needed for libfilcrypto
+          apt-get update && apt-get install -y --no-install-recommends \
+            g++ \
+            libc6-dev \
+            ocl-icd-opencl-dev \
+            jq \
+            pkg-config \
+            python
+
+          # Install Golang
+          curl -sSL "https://golang.org/dl/go$GO_VERSION.linux-amd64.tar.gz" | tar -xz -C /usr/local/
+          chown -R ubuntu:ubuntu /usr/local/go
+          mkdir -p /home/ubuntu/go/bin
+          export GOPATH=/home/ubuntu/go
+          export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+
+          # Set GOPATH in .bashrc
+          echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
+          echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
+
+          # All of these commands are run as root; set proper owner here
+          chown -R ubuntu:ubuntu /home/ubuntu
+          --//
 Outputs:
-  StorageMinerEC2Instance:
+  GenesisNodeEC2Instance:
     Description: Storage mining EC2 instance ID
-    Value: !Ref StorageMinerEC2Instance
-  StorageMinerEC2InstanceIP:
+    Value: !Ref GenesisNodeEC2Instance
+  GenesisNodeEC2InstanceIP:
     Description: IP Address for storage mining EC2 instance
-    Value: !GetAtt StorageMinerEC2Instance.PublicIp
+    Value: !GetAtt GenesisNodeEC2Instance.PublicIp
+  StorageMinerAlphaEC2Instance:
+    Description: Storage mining EC2 instance ID
+    Value: !Ref StorageMinerAlphaEC2Instance
+  StorageMinerAlphaEC2InstanceIP:
+    Description: IP Address for storage mining EC2 instance
+    Value: !GetAtt StorageMinerAlphaEC2Instance.PublicIp

@@ -1,5 +1,5 @@
 Description: >
-  This template deploys a VPC containing a single EC2 instance.
+  This template deploys a cluster of Filecoin nodes.
 
 Parameters:
   EC2KeyName:
@@ -44,6 +44,9 @@ Resources:
         PublicSubnet1CIDR:  10.0.10.0/26 # 64 addresses
 
 Outputs:
-  StorageMinerEC2Instance:
+  GenesisNodeEC2Instance:
+    Description: IP Address for genesis node
+    Value: !GetAtt EC2Instances.Outputs.GenesisNodeEC2InstanceIP
+  StorageMinerAlphaEC2Instance:
     Description: IP Address for storage mining EC2 instance
-    Value: !GetAtt EC2Instances.Outputs.StorageMinerEC2InstanceIP
+    Value: !GetAtt EC2Instances.Outputs.StorageMinerAlphaEC2InstanceIP
