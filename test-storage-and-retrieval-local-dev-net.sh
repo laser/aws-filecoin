@@ -21,6 +21,7 @@ free_port() {
 bootstrap_daemon_port=$(free_port)
 bootstrap_miner_port=$(free_port)
 client_daemon_port=$(free_port)
+genesis_server_port=$(free_port)
 tmux_session="lotus-interop"
 tmux_window_client_daemon="clientdaemon"
 tmux_window_client_cli="clientcli"
@@ -28,6 +29,7 @@ tmux_window_bootstrap_daemon="daemon"
 tmux_window_bootstrap_faucet="faucet"
 tmux_window_bootstrap_miner="miner"
 tmux_window_bootstrap_cli="minercli"
+tmux_window_genesis_server="genesis"
 tmux_window_tmp_setup="setup"
 genesis_miner_addr="t01000"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
@@ -141,6 +143,13 @@ lotus-seed genesis add-miner "${base_dir}/localnet.json" "\$LOTUS_GENESIS_SECTOR
 jq '.Accounts[0].Balance = "1234567890123456789"' "${base_dir}/localnet.json" > "${base_dir}/localnet.json.tmp" && mv "${base_dir}/localnet.json.tmp" "${base_dir}/localnet.json"
 EOF
 
+cat > "${base_dir}/scripts/serve_genesis_file.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+while true; do { echo -ne "HTTP/1.0 200 OK\r\nContent-Length: \$(wc -c <${base_dir}/dev.gen)\r\n\r\n"; cat ${base_dir}/dev.gen; } | nc -l ${genesis_server_port}; done
+EOF
+
 cat > "${base_dir}/scripts/create_miner.bash" <<EOF
 #!/usr/bin/env bash
 set -x
@@ -202,6 +211,7 @@ chmod +x "${base_dir}/scripts/hit_faucet.bash"
 chmod +x "${base_dir}/scripts/propose_storage_deal.bash"
 chmod +x "${base_dir}/scripts/retrieve_stored_file.bash"
 chmod +x "${base_dir}/scripts/start_faucet.bash"
+chmod +x "${base_dir}/scripts/serve_genesis_file.bash"
 
 # build various lotus binaries
 #
@@ -215,6 +225,7 @@ tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_daemon"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_faucet"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_miner"
 tmux new-window -t "$tmux_session" -n "$tmux_window_bootstrap_cli"
+tmux new-window -t "$tmux_session" -n "${tmux_window_genesis_server}"
 tmux new-window -t "$tmux_session" -n "$tmux_window_client_cli"
 tmux new-window -t "$tmux_session" -n "$tmux_window_client_daemon"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
@@ -230,6 +241,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "source ${ba
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_miner}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_faucet}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_cli}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "source ${base_dir}/scripts/env-bootstrap.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_daemon}" "source ${base_dir}/scripts/env-client.$shell" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "source ${base_dir}/scripts/env-client.$shell" C-m
 
@@ -237,6 +249,11 @@ tmux send-keys -t "${tmux_session}:${tmux_window_client_cli}" "source ${base_dir
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "${base_dir}/scripts/create_genesis_block.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_bootstrap_daemon}" "lotus daemon --lotus-make-genesis=${base_dir}/dev.gen --genesis-template=${base_dir}/localnet.json --bootstrap=false --api=${bootstrap_daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
+
+# serve genesis file server
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "${base_dir}/scripts/serve_genesis_file.bash" C-m
 
 # dump multiaddr for networking client and miner daemons
 #
