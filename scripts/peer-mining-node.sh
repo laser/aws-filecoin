@@ -192,6 +192,10 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net connect ${genesis_daemon_multiaddr}" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net connect ${genesis_miner_multiaddr}" C-m
 
+# publish state
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/publish_state.bash" C-m
+
 # select a window and view your handywork
 #
 tmux select-window -t "${tmux_session}:${tmux_window_miner}"
