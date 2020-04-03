@@ -11,8 +11,8 @@ main() {
   local env_name=$2
   local ec2_key_name=$3
   local lotus_git_sha=$4
-  local config_key_prefix=$5
-  local config_bucket_name=$6
+  local config_bucket_name=$5
+  local config_key_prefix=$6
   local templates_stack_name="${env_name}-template-storage"
   local scripts_stack_name="${env_name}-scripts"
 

@@ -20,6 +20,7 @@ tmux_window_tmp_setup="setup"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
 deps=(printf paste jq python nc)
 lotus_git_sha=""
+copy_binaries_from_dir=""
 other_args=()
 kvdb_prefix=""
 kvdb_bucket=""
@@ -50,12 +51,23 @@ do
         lotus_git_sha="${arg#*=}"
         shift
         ;;
+        --copy-binaries-from-dir=*)
+        copy_binaries_from_dir="${arg#*=}"
+        shift
+        ;;
         *)
         other_args+=("$1")
         shift # Remove generic argument from processing
         ;;
     esac
 done
+
+if [[ -z "$lotus_git_sha" ]]; then
+    if [[ -z "$copy_binaries_from_dir" ]]; then
+        (>&2 echo "must provide either --lotus-git-sha or --copy-binaries-from-dir")
+        exit 1
+    fi
+fi
 
 # ensure that script dependencies are met
 #
@@ -105,49 +117,72 @@ cat > "${base_dir}/scripts/build.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-git clone https://github.com/filecoin-project/lotus.git "${base_dir}/build"
-pushd "${base_dir}/build" && git reset --hard "${lotus_git_sha}" && popd
+if [[ ! -z "${copy_binaries_from_dir}" ]]; then
+    pushd ${copy_binaries_from_dir}
+    cp lotus ${base_dir}/bin/
+    popd
+fi
 
-SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-pushd \$SCRIPTDIR/../build
-pwd
-make clean deps debug
-cp lotus lotus-storage-miner ${base_dir}/bin/
-popd
+if [[ ! -z "${lotus_git_sha}" ]]; then
+    git clone https://github.com/filecoin-project/lotus.git "${base_dir}/build"
+    pushd "${base_dir}/build" && git reset --hard "${lotus_git_sha}" && popd
+
+    SCRIPTDIR="\$( cd "\$( dirname "\${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+    pushd \$SCRIPTDIR/../build
+    pwd
+    make clean deps debug
+    cp lotus ${base_dir}/bin/
+    popd
+fi
 EOF
 
-cat > "${base_dir}/scripts/create_miner.bash" <<EOF
+cat > "${base_dir}/scripts/hit_faucet.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
 owner=\$(lotus wallet new bls)
-result=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" ${faucet_url}/mkminer | grep Location)
-query_string=\$(grep -o "\bf=.*\b" <<<\$(echo \$result))
-declare -A param
-while IFS='=' read -r -d '&' key value && [[ -n "\$key" ]]; do
-    param["\$key"]=\$value
-done <<<"\${query_string}&"
-lotus state wait-msg "\${param[f]}"
-maddr=\$(curl "${faucet_url}/msgwaitaddr?cid=\${param[f]}" | jq -r '.addr')
-lotus-storage-miner init --actor=\$maddr --owner=\$owner
+msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" ${faucet_url}/send | tail -1)
+
+lotus state wait-msg \$msg_cid
 EOF
 
-cat > "${base_dir}/scripts/publish_state.bash" <<EOF
+cat > "${base_dir}/scripts/connect_to_network.bash" <<EOF
 #!/usr/bin/env bash
 set -x
 
-public_ip=\$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4 || echo "127.0.0.1")
-daemon_multiaddr=\$(lotus net listen | grep 127 | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
-miner_multiaddr=\$(lotus-storage-miner net listen | grep 127 | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
-miner_id=\$(lotus-storage-miner info | grep Miner | cut -d ' ' -f2)
+lotus net connect ${genesis_daemon_multiaddr}
+lotus net connect ${genesis_miner_multiaddr}
 
-curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${miner_id}_daemon_multiaddr" -d "\${daemon_multiaddr}"
-curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${miner_id}_miner_multiaddr" -d "\${miner_multiaddr}"
+curl https://kvdb.io/${kvdb_bucket}/ | grep "${kvdb_prefix}_t" | xargs -I % curl -s https://kvdb.io/${kvdb_bucket}/% -w '\n' | xargs -I % lotus net connect %
+
+lotus net peers
+EOF
+
+cat > "${base_dir}/scripts/propose_deals.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 1016 | head -n 1 > ${base_dir}/original-data.txt
+original_data_cid=\$(lotus client import ${base_dir}/original-data.txt)
+
+miners=\$(lotus state list-miners)
+
+SAVEIFS=\$IFS   # Save current IFS
+IFS=\$'\n'      # Change IFS to new line
+miners=(\$(lotus state list-miners))
+IFS=\$SAVEIFS   # Restore IFS
+
+for (( i=0; i<\${#miners[@]}; i++ ))
+do
+    lotus client deal "\${original_data_cid}" \${miners[\$i]} 0.000000000001 5
+done
+
 EOF
 
 chmod +x "${base_dir}/scripts/build.bash"
-chmod +x "${base_dir}/scripts/create_miner.bash"
-chmod +x "${base_dir}/scripts/publish_state.bash"
+chmod +x "${base_dir}/scripts/connect_to_network.bash"
+chmod +x "${base_dir}/scripts/hit_faucet.bash"
+chmod +x "${base_dir}/scripts/propose_deals.bash"
 
 # build various lotus binaries
 #
@@ -158,39 +193,33 @@ bash "${base_dir}/scripts/build.bash"
 tmux new-session -d -s "$tmux_session" -n "$tmux_window_tmp_setup"
 tmux set-environment -t "$tmux_session" base_dir "$base_dir"
 tmux new-window -t "$tmux_session" -n "$tmux_window_daemon"
-tmux new-window -t "$tmux_session" -n "$tmux_window_miner"
 tmux new-window -t "$tmux_session" -n "$tmux_window_cli"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 
 # ensure tmux sessions have identical environments
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
 
 # download genesis block and run daemon
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --genesis=<(curl ${genesis_block_url}) --bootstrap=false --api=${daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
 
-# connect to genesis node
+# connect to all nodes and miners in network
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 ${daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus net connect ${genesis_daemon_multiaddr}" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus net connect ${genesis_miner_multiaddr}" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/connect_to_network.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus sync wait" C-m
 
-# start storage miner
+# hit faucet
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "while ! nc -z 127.0.0.1 ${daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "${base_dir}/scripts/create_miner.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner run --api=${storageminer_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
 
-# connect storage miner to genesis node, too
+# make deals!
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 ${storageminer_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net connect ${genesis_daemon_multiaddr}" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net connect ${genesis_miner_multiaddr}" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/propose_deals.bash" C-m
 
-# publish state
+# select a window and view your handywork
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/publish_state.bash" C-m
+tmux select-window -t "${tmux_session}:${tmux_window_cli}"
+tmux attach-session -t "${tmux_session}"
