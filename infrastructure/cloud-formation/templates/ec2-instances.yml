@@ -101,8 +101,16 @@ Resources:
           echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
           echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
 
+          # Download node-configuring script
+          curl -L ${ConfigScriptsKeyPrefix}/peer-mining-node.sh -o ./peer-mining-node.sh
+
           # All of these commands are run as root; set proper owner here
           chown -R ubuntu:ubuntu /home/ubuntu
+
+          # Run config script as `ubuntu` user
+          sudo su - ubuntu
+          ./peer-mining-node.sh --kvdb-prefix=${ConfigKeyPrefix} --kvdb-bucket=${ConfigBucketName} --lotus-git-sha=${LotusGitSHA}
+
           --//
   GenesisNodeEC2Instance:
     Type: AWS::EC2::Instance
@@ -170,8 +178,15 @@ Resources:
           echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
           echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
 
+          # Download node-configuring script
+          curl -L ${ConfigScriptsKeyPrefix}/genesis-node.sh -o ./genesis-node.sh
+
           # All of these commands are run as root; set proper owner here
           chown -R ubuntu:ubuntu /home/ubuntu
+
+          # Run config script as `ubuntu` user
+          sudo su - ubuntu
+          ./genesis-node.sh --kvdb-prefix=${ConfigKeyPrefix} --kvdb-bucket=${ConfigBucketName} --lotus-git-sha=${LotusGitSHA}
           --//
 Outputs:
   GenesisNodeEC2Instance:
