@@ -9,8 +9,16 @@ Parameters:
     Description: Git SHA of lotus to build
     Type: String
   S3TemplateKeyPrefix:
-    Description: >
-      An S3 key prefix which will be used to resolve referenced templates
+    Description: An S3 key prefix which will be used to resolve referenced templates
+    Type: String
+  ConfigScriptsKeyPrefix:
+    Description: An S3 key prefix which will be used to resolve Filecoin node configuration scripts
+    Type: String
+  ConfigKeyPrefix:
+    Description: Prefix of config keys
+    Type: String
+  ConfigBucketName:
+    Description: Configuration bucket name
     Type: String
 
 Resources:
@@ -28,6 +36,9 @@ Resources:
       Parameters:
         AvailabilityZone: !Select [ 0, !GetAZs ]
         EnvironmentName: !Ref AWS::StackName
+        ConfigKeyPrefix: !Ref ConfigKeyPrefix
+        ConfigBucketName: !Ref ConfigBucketName
+        ConfigScriptsKeyPrefix: !Ref ConfigScriptsKeyPrefix
         KeyName: !Ref EC2KeyName
         LotusGitSHA: !Ref LotusGitSHA
         SecurityGroup: !GetAtt SecurityGroups.Outputs.EC2InstancesSecurityGroup

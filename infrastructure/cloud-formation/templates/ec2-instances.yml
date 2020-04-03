@@ -15,6 +15,15 @@ Parameters:
   LotusGitSHA:
     Description: Git SHA of lotus to build
     Type: String
+  ConfigScriptsKeyPrefix:
+    Description: URL prefix where Filecoin node configuration scripts can be downloaded
+    Type: String
+  ConfigKeyPrefix:
+    Description: Prefix of config keys
+    Type: String
+  ConfigBucketName:
+    Description: Configuration bucket name
+    Type: String
   SecurityGroup:
     Description: Security group ID for EC2 instance network interfaces
     Type: AWS::EC2::SecurityGroup::Id
