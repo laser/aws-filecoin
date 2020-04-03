@@ -15,8 +15,11 @@ Parameters:
   LotusGitSHA:
     Description: Git SHA of lotus to build
     Type: String
-  ConfigScriptsKeyPrefix:
-    Description: URL prefix where Filecoin node configuration scripts can be downloaded
+  PeerMiningNodeScriptURL:
+    Description: URL from which peer node configuration-script can be downloaded
+    Type: String
+  GenesisNodeScriptURL:
+    Description: URL from which genesis node configuration-script can be downloaded
     Type: String
   ConfigKeyPrefix:
     Description: Prefix of config keys
@@ -97,20 +100,17 @@ Resources:
           export GOPATH=/home/ubuntu/go
           export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
-          # Set GOPATH in .bashrc
+          # Set various paths in ubuntu user's .bashrc
           echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
+          echo "export XDG_CACHE_HOME=/home/ubuntu/.cache" >> /home/ubuntu/.bashrc
           echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
 
           # Download node-configuring script
-          curl -L ${ConfigScriptsKeyPrefix}/peer-mining-node.sh -o ./peer-mining-node.sh
+          curl -L ${PeerMiningNodeScriptURL} -o /tmp/run.sh
+          chmod +x /tmp/run.sh
 
-          # All of these commands are run as root; set proper owner here
-          chown -R ubuntu:ubuntu /home/ubuntu
-
-          # Run config script as `ubuntu` user
-          sudo su - ubuntu
-          ./peer-mining-node.sh --kvdb-prefix=${ConfigKeyPrefix} --kvdb-bucket=${ConfigBucketName} --lotus-git-sha=${LotusGitSHA}
-
+          # Run config script
+          GOPATH=/home/ubuntu/go PATH=$PATH:/usr/local/go/bin:/home/ubuntu/go/bin XDG_CACHE_HOME=/home/ubuntu/.cache /tmp/run.sh --kvdb-prefix=${ConfigKeyPrefix} --kvdb-bucket=${ConfigBucketName} --lotus-git-sha=${LotusGitSHA}
           --//
   GenesisNodeEC2Instance:
     Type: AWS::EC2::Instance
@@ -174,19 +174,17 @@ Resources:
           export GOPATH=/home/ubuntu/go
           export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
 
-          # Set GOPATH in .bashrc
+          # Set various paths in ubuntu user's .bashrc
           echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
+          echo "export XDG_CACHE_HOME=/home/ubuntu/.cache" >> /home/ubuntu/.bashrc
           echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
 
           # Download node-configuring script
-          curl -L ${ConfigScriptsKeyPrefix}/genesis-node.sh -o ./genesis-node.sh
+          curl -L ${GenesisNodeScriptURL} -o /tmp/run.sh
+          chmod +x /tmp/run.sh
 
-          # All of these commands are run as root; set proper owner here
-          chown -R ubuntu:ubuntu /home/ubuntu
-
-          # Run config script as `ubuntu` user
-          sudo su - ubuntu
-          ./genesis-node.sh --kvdb-prefix=${ConfigKeyPrefix} --kvdb-bucket=${ConfigBucketName} --lotus-git-sha=${LotusGitSHA}
+          # Run config script
+          GOPATH=/home/ubuntu/go PATH=$PATH:/usr/local/go/bin:/home/ubuntu/go/bin XDG_CACHE_HOME=/home/ubuntu/.cache /tmp/run.sh --kvdb-prefix=${ConfigKeyPrefix} --kvdb-bucket=${ConfigBucketName} --lotus-git-sha=${LotusGitSHA}
           --//
 Outputs:
   GenesisNodeEC2Instance:

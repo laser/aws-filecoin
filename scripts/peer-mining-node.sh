@@ -195,8 +195,3 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net 
 # publish state
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/publish_state.bash" C-m
-
-# select a window and view your handywork
-#
-tmux select-window -t "${tmux_session}:${tmux_window_miner}"
-tmux attach-session -t "${tmux_session}"

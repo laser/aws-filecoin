@@ -231,8 +231,3 @@ tmux send-keys -t "${tmux_session}:${tmux_window_faucet}" "${base_dir}/scripts/s
 # publish state
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/publish_state.bash" C-m
-
-# select a window and view your handywork
-#
-tmux select-window -t "${tmux_session}:${tmux_window_cli}"
-tmux attach-session -t "${tmux_session}"

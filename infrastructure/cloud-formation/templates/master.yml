@@ -11,8 +11,9 @@ Parameters:
   S3TemplateKeyPrefix:
     Description: An S3 key prefix which will be used to resolve referenced templates
     Type: String
-  ConfigScriptsKeyPrefix:
-    Description: An S3 key prefix which will be used to resolve Filecoin node configuration scripts
+  PeerMiningNodeScriptURL:
+    Type: String
+  GenesisNodeScriptURL:
     Type: String
   ConfigKeyPrefix:
     Description: Prefix of config keys
@@ -38,7 +39,8 @@ Resources:
         EnvironmentName: !Ref AWS::StackName
         ConfigKeyPrefix: !Ref ConfigKeyPrefix
         ConfigBucketName: !Ref ConfigBucketName
-        ConfigScriptsKeyPrefix: !Ref ConfigScriptsKeyPrefix
+        PeerMiningNodeScriptURL: !Ref PeerMiningNodeScriptURL
+        GenesisNodeScriptURL: !Ref GenesisNodeScriptURL
         KeyName: !Ref EC2KeyName
         LotusGitSHA: !Ref LotusGitSHA
         SecurityGroup: !GetAtt SecurityGroups.Outputs.EC2InstancesSecurityGroup
