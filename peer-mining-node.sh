@@ -21,7 +21,7 @@ base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
 deps=(printf paste jq python nc)
 lotus_git_sha=""
 other_args=()
-kvdb_nonce=""
+kvdb_prefix=""
 kvdb_bucket=""
 
 # ensure that script dependencies are met
@@ -38,8 +38,8 @@ done
 for arg in "$@"
 do
     case $arg in
-        --kvdb-nonce=*)
-        kvdb_nonce="${arg#*=}"
+        --kvdb-prefix=*)
+        kvdb_prefix="${arg#*=}"
         shift
         ;;
         --kvdb-bucket=*)
@@ -68,18 +68,24 @@ done
 
 # wait for correct values to show up in kvdb
 #
-nonce=$(curl "https://kvdb.io/${kvdb_bucket}/nonce")
-while [[ ! "${nonce}" = "${kvdb_nonce}" ]]; do
-  sleep 5
-  nonce=$(curl "https://kvdb.io/${kvdb_bucket}/nonce")
+end=$(( $(date +%s) + ((60 * 10)) )) # 10 minutes
+url="https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_block_url"
+while [[ "$(curl -sL -w "%{http_code}\\n" ${url} -o /dev/null)" != "200" ]]; do
+    if [[ ! $(date +%s) -lt ${end} ]]; then
+        (>&2 echo "timed out waiting for genesis block to become available (${url})")
+        exit 1
+    fi
+
+    (>&2 echo "genesis block (${url}) not yet available - sleeping 5s")
+    sleep 5
 done
 
 # download all genesis info from kvdb
 #
-genesis_daemon_multiaddr=$(curl "https://kvdb.io/${kvdb_bucket}/genesis_daemon_multiaddr")
-genesis_miner_multiaddr=$(curl "https://kvdb.io/${kvdb_bucket}/genesis_miner_multiaddr")
-faucet_url=$(curl "https://kvdb.io/${kvdb_bucket}/faucet_url")
-genesis_block_url=$(curl "https://kvdb.io/${kvdb_bucket}/genesis_block_url")
+genesis_daemon_multiaddr=$(curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_daemon_multiaddr")
+genesis_miner_multiaddr=$(curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_miner_multiaddr")
+faucet_url=$(curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_faucet_url")
+genesis_block_url=$(curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_block_url")
 
 # create some directories which we'll need later
 #
@@ -126,8 +132,23 @@ maddr=\$(curl "${faucet_url}/msgwaitaddr?cid=\${param[f]}" | jq -r '.addr')
 lotus-storage-miner init --actor=\$maddr --owner=\$owner
 EOF
 
+cat > "${base_dir}/scripts/publish_state.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+public_ip=\$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4 || echo "127.0.0.1")
+ma1=\$(cat ${base_dir}/.daemon-multiaddr | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
+ma2=\$(cat ${base_dir}/.miner-multiaddr | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
+
+miner_id=\$(lotus-storage-miner info | grep Miner | cut -d ' ' -f2)
+
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${miner_id}_daemon_multiaddr" -d "\${ma1}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${miner_id}_miner_multiaddr" -d "\${ma2}"
+EOF
+
 chmod +x "${base_dir}/scripts/build.bash"
 chmod +x "${base_dir}/scripts/create_miner.bash"
+chmod +x "${base_dir}/scripts/publish_state.bash"
 
 # build various lotus binaries
 #

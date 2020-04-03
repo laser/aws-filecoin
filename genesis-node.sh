@@ -24,7 +24,7 @@ deps=(printf paste jq python nc)
 lotus_git_sha=""
 copy_binaries_from_dir=""
 other_args=()
-kvdb_nonce=""
+kvdb_prefix=""
 kvdb_bucket=""
 
 # ensure that script dependencies are met
@@ -41,8 +41,8 @@ done
 for arg in "$@"
 do
     case $arg in
-        --kvdb-nonce=*)
-        kvdb_nonce="${arg#*=}"
+        --kvdb-prefix=*)
+        kvdb_prefix="${arg#*=}"
         shift
         ;;
         --kvdb-bucket=*)
@@ -76,8 +76,8 @@ if [[ -z "$kvdb_bucket" ]]; then
     exit 1
 fi
 
-if [[ -z "$kvdb_nonce" ]]; then
-    (>&2 echo "must provide --kvdb-nonce")
+if [[ -z "$kvdb_prefix" ]]; then
+    (>&2 echo "must provide --kvdb-prefix")
     exit 1
 fi
 
@@ -164,15 +164,10 @@ public_ip=\$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4 || ec
 ma1=\$(cat ${base_dir}/.daemon-multiaddr | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
 ma2=\$(cat ${base_dir}/.miner-multiaddr | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
 
-curl https://kvdb.io/${kvdb_bucket}/nonce -d "${kvdb_nonce}"
-curl https://kvdb.io/${kvdb_bucket}/lastupdate -d "$(date +%s)"
-curl https://kvdb.io/${kvdb_bucket}/genesis_daemon_multiaddr -d "\${ma1}"
-curl https://kvdb.io/${kvdb_bucket}/genesis_miner_multiaddr -d "\${ma2}"
-curl https://kvdb.io/${kvdb_bucket}/faucet_url -d "http://\${public_ip}:${faucet_port}"
-curl https://kvdb.io/${kvdb_bucket}/genesis_block_url -d "http://\${public_ip}:${genesis_server_port}"
-
-keys="nonce lastupdate daemon_multiaddr miner_multiaddr faucet_url genesis_server_url"
-curl https://kvdb.io/${kvdb_bucket}/keys -d "\${keys}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_daemon_multiaddr" -d "\${ma1}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_miner_multiaddr" -d "\${ma2}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_faucet_url" -d "http://\${public_ip}:${faucet_port}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_block_url" -d "http://\${public_ip}:${genesis_server_port}"
 EOF
 
 chmod +x "${base_dir}/scripts/build.bash"
