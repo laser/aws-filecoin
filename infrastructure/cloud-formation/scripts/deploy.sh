@@ -67,8 +67,8 @@ main() {
     --template-file ../templates/master.yml \
     --parameter-overrides \
     S3TemplateKeyPrefix="https://${templates_stack_name}.s3.amazonaws.com/infrastructure/cloud-formation/templates/" \
-    GenesisNodeScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/genesis-node.sh" \
-    PeerMiningNodeScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/peer-mining-node.sh" \
+    GenesisMinerScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/genesis-node.sh" \
+    PeeredMinerScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/peer-mining-node.sh" \
     LotusGitSHA="${lotus_git_sha}" \
     ConfigKeyPrefix="${config_key_prefix}" \
     ConfigBucketName="${config_bucket_name}" \
