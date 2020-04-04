@@ -16,6 +16,7 @@ tmux_session="lotus"
 tmux_window_daemon="daemon"
 tmux_window_miner="miner"
 tmux_window_cli="cli"
+tmux_window_poller="poller"
 tmux_window_tmp_setup="setup"
 base_dir=$(mktemp -d -t "lotus-interopnet.XXXX")
 deps=(printf paste jq python nc)
@@ -194,17 +195,14 @@ tmux new-session -d -s "$tmux_session" -n "$tmux_window_tmp_setup"
 tmux set-environment -t "$tmux_session" base_dir "$base_dir"
 tmux new-window -t "$tmux_session" -n "$tmux_window_daemon"
 tmux new-window -t "$tmux_session" -n "$tmux_window_cli"
+tmux new-window -t "$tmux_session" -n "$tmux_window_poller"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 
 # ensure tmux sessions have identical environments
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
-
-# log tmux sessions
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "tmux pipe-pane -o 'cat >> ~/tmux_output_daemon_${kvdb_prefix}.#S:#I-#P'" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "tmux pipe-pane -o 'cat >> ~/tmux_output_cli_${kvdb_prefix}.#S:#I-#P'" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_poller}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
 
 # download genesis block and run daemon
 #
@@ -216,6 +214,11 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/connect_to_network.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus sync wait" C-m
 
+# launch poller
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_poller}" "while ! nc -z 127.0.0.1 ${daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_poller}" "while true; do lotus client list-deals; lotus state list-miners | xargs -I % sh -c 'echo \"miner: %, power: \$(lotus state power %)\"'; sleep 10; done" C-m
+
 # hit faucet
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/hit_faucet.bash" C-m
@@ -226,5 +229,5 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/prop
 
 # select a window and view your handywork
 #
-tmux select-window -t "${tmux_session}:${tmux_window_cli}"
+tmux select-window -t "${tmux_session}:${tmux_window_poller}"
 tmux attach-session -t "${tmux_session}"
