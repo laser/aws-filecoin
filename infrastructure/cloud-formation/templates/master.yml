@@ -43,26 +43,26 @@ Resources:
         VpcCIDR:            10.0.0.0/16
         PublicSubnet1CIDR:  10.0.10.0/26 # 64 addresses
   EC2InstanceGenesisMiner:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub ${TemplateURLPrefix}ec2-instance-genesis-miner.yml
+    Fn::Transform:
+      Name: AWS::Include
       Parameters:
-        Fn::Transform:
-          Name: AWS::Include
-          Parameters:
-            Location: !Sub ${TemplateS3Prefix}ec2-instance-stack-arguments.yml
+        Location: !Sub ${TemplateS3Prefix}stack-genesis-miner.yml
   EC2InstancePeeredMiner00:
-    Type: AWS::CloudFormation::Stack
-    Properties:
-      TemplateURL: !Sub ${TemplateURLPrefix}ec2-instance-peered-miner.yml
+    Fn::Transform:
+      Name: AWS::Include
       Parameters:
-        Fn::Transform:
-          Name: AWS::Include
-          Parameters:
-            Location: !Sub ${TemplateS3Prefix}ec2-instance-stack-arguments.yml
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner01:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
 
 Outputs:
   EC2InstanceGenesisMiner:
     Value: !GetAtt EC2InstanceGenesisMiner.Outputs.EC2InstanceGenesisMinerIP
-  EC2InstancePeeredMiner00:
-    Value: !GetAtt EC2InstancePeeredMiner00.Outputs.EC2InstancePeeredMinerIP
+  EC2InstancePeeredMinerIPs:
+    Value: !Join
+      - " "
+      - - !GetAtt EC2InstancePeeredMiner00.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner01.Outputs.EC2InstancePeeredMinerIP

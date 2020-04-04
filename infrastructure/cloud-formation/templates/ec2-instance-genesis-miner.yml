@@ -18,9 +18,6 @@ Parameters:
   GenesisMinerScriptURL:
     Description: URL from which genesis node configuration-script can be downloaded
     Type: String
-  PeeredMinerScriptURL:
-    Description: URL from which peer node configuration-script can be downloaded
-    Type: String
   ConfigKeyPrefix:
     Description: Prefix of config keys
     Type: String

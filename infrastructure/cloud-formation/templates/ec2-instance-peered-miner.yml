@@ -15,9 +15,6 @@ Parameters:
   LotusGitSHA:
     Description: Git SHA of lotus to build
     Type: String
-  GenesisMinerScriptURL:
-    Description: URL from which genesis node configuration-script can be downloaded
-    Type: String
   PeeredMinerScriptURL:
     Description: URL from which peer node configuration-script can be downloaded
     Type: String
