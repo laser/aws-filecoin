@@ -165,6 +165,7 @@ set -x
 
 cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 1016 | head -n 1 > ${base_dir}/original-data.txt
 original_data_cid=\$(lotus client import ${base_dir}/original-data.txt)
+echo "\${original_data_cid}" > ${base_dir}/original-data.cid
 
 miners=\$(lotus state list-miners)
 
