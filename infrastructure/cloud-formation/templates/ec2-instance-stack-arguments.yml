@@ -1,0 +1,24 @@
+AvailabilityZone:
+  'Fn::Select':
+    - 0
+    - Fn::GetAZs: ""
+EnvironmentName:
+  Ref: AWS::StackName
+ConfigKeyPrefix:
+  Ref: ConfigKeyPrefix
+ConfigBucketName:
+  Ref: ConfigBucketName
+PeeredMinerScriptURL:
+  Ref: PeeredMinerScriptURL
+GenesisMinerScriptURL:
+  Ref: GenesisMinerScriptURL
+KeyName:
+  Ref: EC2KeyName
+LotusGitSHA:
+  Ref: LotusGitSHA
+SecurityGroup:
+  'Fn::GetAtt':  SecurityGroups.Outputs.EC2InstancesSecurityGroup
+Subnet:
+  'Fn::GetAtt':  Network.Outputs.PublicSubnet1
+VPC:
+  'Fn::GetAtt':  Network.Outputs.VPC

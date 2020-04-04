@@ -66,7 +66,8 @@ main() {
     --capabilities CAPABILITY_NAMED_IAM CAPABILITY_IAM \
     --template-file ../templates/master.yml \
     --parameter-overrides \
-    S3TemplateKeyPrefix="https://${templates_stack_name}.s3.amazonaws.com/infrastructure/cloud-formation/templates/" \
+    TemplateS3Prefix="s3://${templates_stack_name}/infrastructure/cloud-formation/templates/" \
+    TemplateURLPrefix="https://${templates_stack_name}.s3.amazonaws.com/infrastructure/cloud-formation/templates/" \
     GenesisMinerScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/genesis-node.sh" \
     PeeredMinerScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/peer-mining-node.sh" \
     LotusGitSHA="${lotus_git_sha}" \

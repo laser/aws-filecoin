@@ -8,8 +8,11 @@ Parameters:
   LotusGitSHA:
     Description: Git SHA of lotus to build
     Type: String
-  S3TemplateKeyPrefix:
-    Description: An S3 key prefix which will be used to resolve referenced templates
+  TemplateURLPrefix:
+    Description: A prefix used to construct HTTP URLs from which we download CloudFormation templates (contains trailing slash)
+    Type: String
+  TemplateS3Prefix:
+    Description: A prefix used to construct S3 URLs from which we construct AWS::Include snippets (contains trailing slash)
     Type: String
   PeeredMinerScriptURL:
     Type: String
@@ -26,14 +29,14 @@ Resources:
   SecurityGroups:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub ${S3TemplateKeyPrefix}security-groups.yml
+      TemplateURL: !Sub ${TemplateURLPrefix}security-groups.yml
       Parameters:
         EnvironmentName: !Ref AWS::StackName
         VPC: !GetAtt Network.Outputs.VPC
   Network:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub ${S3TemplateKeyPrefix}network.yml
+      TemplateURL: !Sub ${TemplateURLPrefix}network.yml
       Parameters:
         AvailabilityZone:   !Select [ 0, !GetAZs ]
         EnvironmentName:    !Ref AWS::StackName
@@ -42,33 +45,21 @@ Resources:
   EC2InstanceGenesisMiner:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub ${S3TemplateKeyPrefix}ec2-instance-genesis-miner.yml
+      TemplateURL: !Sub ${TemplateURLPrefix}ec2-instance-genesis-miner.yml
       Parameters:
-        AvailabilityZone: !Select [ 0, !GetAZs ]
-        EnvironmentName: !Ref AWS::StackName
-        ConfigKeyPrefix: !Ref ConfigKeyPrefix
-        ConfigBucketName: !Ref ConfigBucketName
-        GenesisMinerScriptURL: !Ref GenesisMinerScriptURL
-        KeyName: !Ref EC2KeyName
-        LotusGitSHA: !Ref LotusGitSHA
-        SecurityGroup: !GetAtt SecurityGroups.Outputs.EC2InstancesSecurityGroup
-        Subnet: !GetAtt Network.Outputs.PublicSubnet1
-        VPC: !GetAtt Network.Outputs.VPC
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: !Sub ${TemplateS3Prefix}ec2-instance-stack-arguments.yml
   EC2InstancePeeredMiner00:
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: !Sub ${S3TemplateKeyPrefix}ec2-instance-peered-miner.yml
+      TemplateURL: !Sub ${TemplateURLPrefix}ec2-instance-peered-miner.yml
       Parameters:
-        AvailabilityZone: !Select [ 0, !GetAZs ]
-        EnvironmentName: !Ref AWS::StackName
-        ConfigKeyPrefix: !Ref ConfigKeyPrefix
-        ConfigBucketName: !Ref ConfigBucketName
-        PeeredMinerScriptURL: !Ref PeeredMinerScriptURL
-        KeyName: !Ref EC2KeyName
-        LotusGitSHA: !Ref LotusGitSHA
-        SecurityGroup: !GetAtt SecurityGroups.Outputs.EC2InstancesSecurityGroup
-        Subnet: !GetAtt Network.Outputs.PublicSubnet1
-        VPC: !GetAtt Network.Outputs.VPC
+        Fn::Transform:
+          Name: AWS::Include
+          Parameters:
+            Location: !Sub ${TemplateS3Prefix}ec2-instance-stack-arguments.yml
 
 Outputs:
   EC2InstanceGenesisMiner:
