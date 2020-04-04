@@ -1,6 +1,6 @@
 Description: >
-  This template contains the EC2 instance on which we run our storage miner and
-  client.
+  This template contains the EC2 instance on which we run the genesis node and
+  storage miner.
 
 Parameters:
   AvailabilityZone:

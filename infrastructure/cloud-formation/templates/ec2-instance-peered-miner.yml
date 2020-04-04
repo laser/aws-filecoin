@@ -1,6 +1,6 @@
 Description: >
-  This template contains the EC2 instance on which we run our storage miner and
-  client.
+  This template configures an EC2 instance on which we run a daemon and a
+  storage miner.
 
 Parameters:
   AvailabilityZone:

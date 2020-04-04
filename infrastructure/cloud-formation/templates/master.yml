@@ -57,8 +57,99 @@ Resources:
       Name: AWS::Include
       Parameters:
         Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner02:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner03:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner04:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner05:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner06:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner07:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner08:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner09:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner10:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner11:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner12:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner13:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner14:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner15:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner16:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner17:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner18:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+  EC2InstancePeeredMiner19:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
 
 Outputs:
+  GenesisBlock
   EC2InstanceGenesisMiner:
     Value: !GetAtt EC2InstanceGenesisMiner.Outputs.EC2InstanceGenesisMinerIP
   EC2InstancePeeredMinerIPs:
@@ -66,3 +157,21 @@ Outputs:
       - " "
       - - !GetAtt EC2InstancePeeredMiner00.Outputs.EC2InstancePeeredMinerIP
         - !GetAtt EC2InstancePeeredMiner01.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner02.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner03.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner04.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner05.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner06.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner07.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner08.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner09.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner10.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner11.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner12.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner13.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner14.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner15.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner16.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner17.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner18.Outputs.EC2InstancePeeredMinerIP
+        - !GetAtt EC2InstancePeeredMiner19.Outputs.EC2InstancePeeredMinerIP
