@@ -143,6 +143,7 @@ miner_id=\$(lotus-storage-miner info | grep Miner | cut -d ' ' -f2)
 
 curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${miner_id}_daemon_multiaddr" -d "\${daemon_multiaddr}"
 curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${miner_id}_miner_multiaddr" -d "\${miner_multiaddr}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${public_ip}" -d "\${miner_id}"
 EOF
 
 chmod +x "${base_dir}/scripts/build.bash"
@@ -170,7 +171,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "source ${base_dir}/scrip
 
 # download genesis block and run daemon
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --genesis=<(curl ${genesis_block_url}) --bootstrap=false --api=${daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --genesis=<(curl ${genesis_block_url}) --bootstrap=false --api=${daemon_port} 2>&1 | tee -a /var/log/daemon.log" C-m
 
 # connect to genesis node
 #
@@ -183,7 +184,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus sync wait" C-m
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "while ! nc -z 127.0.0.1 ${daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "${base_dir}/scripts/create_miner.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner run --api=${storageminer_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner run --api=${storageminer_port} --nosync 2>&1 | tee -a /var/log/miner.log" C-m
 
 # connect storage miner to genesis node, too
 #

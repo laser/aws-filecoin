@@ -1,0 +1,27 @@
+Type: AWS::CloudFormation::Stack
+Properties:
+  TemplateURL:
+    'Fn::Sub': ${TemplateURLPrefix}ec2-instance-genesis-miner.yml
+  Parameters:
+    AvailabilityZone:
+      'Fn::Select':
+        - 0
+        - Fn::GetAZs: ""
+    EnvironmentName:
+      Ref: AWS::StackName
+    ConfigKeyPrefix:
+      Ref: ConfigKeyPrefix
+    ConfigBucketName:
+      Ref: ConfigBucketName
+    GenesisMinerScriptURL:
+      Ref: GenesisMinerScriptURL
+    KeyName:
+      Ref: EC2KeyName
+    LotusGitSHA:
+      Ref: LotusGitSHA
+    SecurityGroup:
+      'Fn::GetAtt':  SecurityGroups.Outputs.EC2InstancesSecurityGroup
+    Subnet:
+      'Fn::GetAtt':  Network.Outputs.PublicSubnet1
+    VPC:
+      'Fn::GetAtt':  Network.Outputs.VPC
