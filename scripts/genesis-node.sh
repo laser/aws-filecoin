@@ -163,9 +163,11 @@ set -x
 public_ip=\$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4 || echo "127.0.0.1")
 ma1=\$(cat ${base_dir}/.daemon-multiaddr | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
 ma2=\$(cat ${base_dir}/.miner-multiaddr | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
+miner_id=\$(lotus-storage-miner info | grep Miner | cut -d' ' -f2)
 
 curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_daemon_multiaddr" -d "\${ma1}"
 curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_miner_multiaddr" -d "\${ma2}"
+curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_\${public_ip}" -d "\${miner_id}"
 curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_faucet_url" -d "http://\${public_ip}:${faucet_port}"
 curl "https://kvdb.io/${kvdb_bucket}/${kvdb_prefix}_genesis_block_url" -d "http://\${public_ip}:${genesis_server_port}"
 EOF
@@ -203,7 +205,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "source ${base
 # create genesis block and run bootstrap daemon
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "${base_dir}/scripts/create_genesis_block.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --lotus-make-genesis=${base_dir}/dev.gen --genesis-template=${base_dir}/localnet.json --bootstrap=false --api=${bootstrap_daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --lotus-make-genesis=${base_dir}/dev.gen --genesis-template=${base_dir}/localnet.json --bootstrap=false --api=${bootstrap_daemon_port} 2>&1 | tee -a /var/log/daemon.log" C-m
 
 # serve genesis file server
 #
@@ -214,7 +216,7 @@ tmux send-keys -t "${tmux_session}:${tmux_window_genesis_server}" "${base_dir}/s
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "while ! nc -z 127.0.0.1 ${bootstrap_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "${base_dir}/scripts/create_miner.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a ${base_dir}/miner.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner run --api=${bootstrap_miner_port} --nosync 2>&1 | tee -a /var/log/miner.log" C-m
 
 # dump multiaddr sfor networking client and miner daemons
 #

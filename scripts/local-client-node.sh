@@ -201,6 +201,11 @@ tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "source ${base_dir}/scripts/env-bootstrap.bash" C-m
 
+# log tmux sessions
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "tmux pipe-pane -o 'cat >> ~/tmux_output_daemon_${kvdb_prefix}.#S:#I-#P'" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "tmux pipe-pane -o 'cat >> ~/tmux_output_cli_${kvdb_prefix}.#S:#I-#P'" C-m
+
 # download genesis block and run daemon
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --genesis=<(curl ${genesis_block_url}) --bootstrap=false --api=${daemon_port} 2>&1 | tee -a ${base_dir}/daemon.log" C-m
