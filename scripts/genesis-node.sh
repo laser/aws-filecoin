@@ -230,6 +230,10 @@ tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net 
 tmux send-keys -t "${tmux_session}:${tmux_window_faucet}" "while ! nc -z 127.0.0.1 ${bootstrap_miner_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_faucet}" "${base_dir}/scripts/start_faucet.bash" C-m
 
+# set the miner price
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner set-price 0.00000000049" C-m
+
 # publish state
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "${base_dir}/scripts/publish_state.bash" C-m

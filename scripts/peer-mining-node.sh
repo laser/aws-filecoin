@@ -121,6 +121,10 @@ cat > "${base_dir}/scripts/create_miner.bash" <<EOF
 set -x
 
 owner=\$(lotus wallet new bls)
+
+msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" ${faucet_url}/send | tail -1)
+lotus state wait-msg \$msg_cid
+
 result=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" ${faucet_url}/mkminer | grep Location)
 query_string=\$(grep -o "\bf=.*\b" <<<\$(echo \$result))
 declare -A param
@@ -178,12 +182,16 @@ tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "lotus daemon --genesi
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 ${daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus net connect ${genesis_daemon_multiaddr}" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus net connect ${genesis_miner_multiaddr}" C-m
+
+# wait for 10-120 seconds and then attempt to sync chain
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "sleep \$(shuf -i 10-120 -n 1)" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus sync wait" C-m
 
 # start storage miner
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "while ! nc -z 127.0.0.1 ${daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "${base_dir}/scripts/create_miner.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "(timeout --kill-after=60 60 ${base_dir}/scripts/create_miner.bash) || (rm -rf \${LOTUS_STORAGE_PATH} && timeout --kill-after=120 120 ${base_dir}/scripts/create_miner.bash) || (rm -rf \${LOTUS_STORAGE_PATH} && timeout --kill-after=180 180 ${base_dir}/scripts/create_miner.bash)" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner run --api=${storageminer_port} --nosync 2>&1 | tee -a /var/log/miner.log" C-m
 
 # connect storage miner to genesis node, too
@@ -191,6 +199,10 @@ tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner ru
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 ${storageminer_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net connect ${genesis_daemon_multiaddr}" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner net connect ${genesis_miner_multiaddr}" C-m
+
+# set the miner price
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner set-price 0.00000000049" C-m
 
 # publish state
 #
