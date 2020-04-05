@@ -2,14 +2,11 @@ Description: >
   This template deploys a VPC with a public subnet in a single AZ.
 
 Parameters:
-  AvailabilityZone:
-    Description: Availability zone to deploy
-    Type: AWS::EC2::AvailabilityZone::Name
   EnvironmentName:
     Description: An environment name that will be prefixed to resource names
     Type: String
   PublicSubnet1CIDR:
-    Description: Please enter the IP range (CIDR notation) for the public subnet in the first Availability Zone
+    Description: Please enter the IP range (CIDR notation) for the public subnet
     Type: String
   VpcCIDR:
     Description: Please enter the IP range (CIDR notation) for this VPC
@@ -38,7 +35,6 @@ Resources:
     Type: AWS::EC2::Subnet
     Properties:
       VpcId: !Ref VPC
-      AvailabilityZone: !Ref AvailabilityZone
       CidrBlock: !Ref PublicSubnet1CIDR
       MapPublicIpOnLaunch: true
       Tags:
@@ -82,5 +78,5 @@ Outputs:
     Description: A list of the public subnets
     Value: !Join [ ",", [ !Ref PublicSubnet1 ]]
   PublicSubnet1:
-    Description: A reference to the public subnet in the 1st Availability Zone
+    Description: A reference to the public subnet
     Value: !Ref PublicSubnet1

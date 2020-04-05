@@ -3,9 +3,6 @@ Description: >
   storage miner.
 
 Parameters:
-  AvailabilityZone:
-    Description: Availability zone to deploy
-    Type: AWS::EC2::AvailabilityZone::Name
   EnvironmentName:
     Description: An environment name that will be prefixed to resource names
     Type: String
@@ -38,7 +35,6 @@ Resources:
   EC2InstanceGenesisMiner:
     Type: AWS::EC2::Instance
     Properties:
-      AvailabilityZone: !Ref AvailabilityZone
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
