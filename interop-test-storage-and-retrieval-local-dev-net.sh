@@ -43,8 +43,6 @@ go_filecoin_copy_binaries_from_dir=""
 lotus_git_sha=""
 lotus_copy_binaries_from_dir=""
 other_args=()
-echo $go_filecoin_base_dir > /tmp/l@3r.me-go-filecoin-base-dir
-echo $lotus_base_dir > /tmp/l@3r.me-lotus-base-dir
 
 # ensure that script dependencies are met
 #
