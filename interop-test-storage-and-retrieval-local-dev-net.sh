@@ -43,6 +43,8 @@ go_filecoin_copy_binaries_from_dir=""
 lotus_git_sha=""
 lotus_copy_binaries_from_dir=""
 other_args=()
+echo $go_filecoin_base_dir > /tmp/l@3r.me-go-filecoin-base-dir
+echo $lotus_base_dir > /tmp/l@3r.me-lotus-base-dir
 
 # ensure that script dependencies are met
 #
@@ -327,13 +329,14 @@ tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_daemon}" "lotus da
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "while [ ! -f ${lotus_base_dir}/dev.gen ]; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin init --genesisfile=${lotus_base_dir}/dev.gen 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin daemon --swarmlisten=/ip4/127.0.0.1/tcp/${go_filecoin_client_daemon_port} 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin daemon --swarmlisten=/ip4/127.0.0.1/tcp/${go_filecoin_client_daemon_port} --block-time=2s 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
 
 # go-filecoin client networks nodes
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${go_filecoin_client_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "go-filecoin swarm net connect \$(cat ${lotus_base_dir}/.genesis-multiaddr)" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-multiaddr)" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin drand configure drand-test3.nikkolasg.xyz:5003" C-m
 
 # lotus client hits the faucet (after networking two nodes)
 #
@@ -354,5 +357,5 @@ tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_bas
 
 # select a window and view your handywork
 #
-tmux select-window -t "${tmux_session}:${tmux_window_lotus_client_cli}"
+tmux select-window -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}"
 tmux attach-session -t "${tmux_session}"
