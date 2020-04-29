@@ -436,5 +436,5 @@ tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "${go_
 
 # select a window and view your handywork
 #
-tmux select-window -t "${tmux_session}:${tmux_window_lotus_client_cli}"
+tmux select-window -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}"
 tmux attach-session -t "${tmux_session}"
