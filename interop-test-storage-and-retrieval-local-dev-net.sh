@@ -18,17 +18,18 @@ free_port() {
     python -c "import socket; s = socket.socket(); s.bind(('', 0)); print(s.getsockname()[1])"
 }
 
-genesis_daemon_port=$(free_port)
-genesis_miner_port=$(free_port)
-client_daemon_port=$(free_port)
+lotus_genesis_daemon_port=$(free_port)
+lotus_genesis_miner_port=$(free_port)
+lotus_client_daemon_port=$(free_port)
 go_filecoin_client_daemon_port=$(free_port)
 tmux_session="interop"
 tmux_window_go_filecoin_client_cli="g-clientcli"
 tmux_window_go_filecoin_client_daemon="g-clientdaemon"
-tmux_window_lotus_genesis_cli="l-minercli"
+tmux_window_lotus_genesis_daemon_cli="l-daemoncli"
 tmux_window_lotus_genesis_daemon="l-daemon"
 tmux_window_lotus_genesis_faucet="l-faucet"
 tmux_window_lotus_genesis_miner="l-miner"
+tmux_window_lotus_genesis_miner_cli="l-minercli"
 tmux_window_lotus_client_cli="l-clientcli"
 tmux_window_lotus_client_daemon="l-clientdaemon"
 tmux_window_tmp_setup="setup"
@@ -43,6 +44,9 @@ go_filecoin_copy_binaries_from_dir=""
 lotus_git_sha=""
 lotus_copy_binaries_from_dir=""
 other_args=()
+drand_host="drand-test3.nikkolasg.xyz"
+drand_port="5003"
+genesis_fountain_starting_funds="50000000000000000000000"
 
 # ensure that script dependencies are met
 #
@@ -100,7 +104,6 @@ fi
 mkdir -p "${lotus_base_dir}"
 mkdir -p "${lotus_base_dir}/scripts"
 mkdir -p "${lotus_base_dir}/bin"
-mkdir -p "${go_filecoin_base_dir}"
 mkdir -p "${go_filecoin_base_dir}"
 mkdir -p "${go_filecoin_base_dir}/scripts"
 mkdir -p "${go_filecoin_base_dir}/bin"
@@ -182,7 +185,7 @@ set -xe
 HOME="${lotus_base_dir}" lotus-seed pre-seal --sector-size 2048 --num-sectors 2 --miner-addr "${genesis_miner_addr}"
 lotus-seed genesis new "${lotus_base_dir}/localnet.json"
 lotus-seed genesis add-miner "${lotus_base_dir}/localnet.json" "\$LOTUS_GENESIS_SECTORS/pre-seal-${genesis_miner_addr}.json"
-jq '.Accounts[0].Balance = "1234567890123456789"' "${lotus_base_dir}/localnet.json" > "${lotus_base_dir}/localnet.json.tmp" && mv "${lotus_base_dir}/localnet.json.tmp" "${lotus_base_dir}/localnet.json"
+jq '.Accounts[0].Balance = "${genesis_fountain_starting_funds}"' "${lotus_base_dir}/localnet.json" > "${lotus_base_dir}/localnet.json.tmp" && mv "${lotus_base_dir}/localnet.json.tmp" "${lotus_base_dir}/localnet.json"
 EOF
 
 cat > "${lotus_base_dir}/scripts/create_miner-lotus.bash" <<EOF
@@ -276,52 +279,59 @@ fi
 #
 tmux new-session -d -s "$tmux_session" -n "$tmux_window_tmp_setup"
 tmux set-environment -t "$tmux_session" base_dir "$lotus_base_dir"
-tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_daemon"
-tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_faucet"
-tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_miner"
-tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_cli"
-tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_client_cli"
-tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_client_daemon"
 tmux new-window -t "$tmux_session" -n "$tmux_window_go_filecoin_client_cli"
 tmux new-window -t "$tmux_session" -n "$tmux_window_go_filecoin_client_daemon"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_client_cli"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_client_daemon"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_daemon"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_daemon_cli"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_faucet"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_miner"
+tmux new-window -t "$tmux_session" -n "$tmux_window_lotus_genesis_miner_cli"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 
 # ensure tmux sessions have identical environments
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_faucet}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_cli}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_daemon}" "source ${lotus_base_dir}/scripts/env-client-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "source ${lotus_base_dir}/scripts/env-client-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "source ${go_filecoin_base_dir}/scripts/env-client-go-filecoin.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "source ${go_filecoin_base_dir}/scripts/env-client-go-filecoin.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "source ${go_filecoin_base_dir}/scripts/env-client-go-filecoin.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "source ${lotus_base_dir}/scripts/env-client-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_daemon}" "source ${lotus_base_dir}/scripts/env-client-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon_cli}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_faucet}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner_cli}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "source ${lotus_base_dir}/scripts/env-genesis-lotus.bash" C-m
 
 # create genesis block and run genesis daemon
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon}" "${lotus_base_dir}/scripts/create_genesis_block-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon}" "lotus daemon --lotus-make-genesis=${lotus_base_dir}/dev.gen --genesis-template=${lotus_base_dir}/localnet.json --bootstrap=false --api=${genesis_daemon_port} 2>&1 | tee -a ${lotus_base_dir}/daemon.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon}" "lotus daemon --lotus-make-genesis=${lotus_base_dir}/dev.gen --genesis-template=${lotus_base_dir}/localnet.json --bootstrap=false --api=${lotus_genesis_daemon_port} 2>&1 | tee -a ${lotus_base_dir}/daemon.log" C-m
 
-# dump multiaddr for networking client and miner daemons
+# dump genesis daemon multiaddr
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_cli}" "while ! nc -z 127.0.0.1 ${genesis_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_cli}" "lotus net listen | grep 127 > ${lotus_base_dir}/.genesis-multiaddr" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_daemon_cli}" "lotus net listen | grep 127 > ${lotus_base_dir}/.genesis-daemon-multiaddr" C-m
 
 # start genesis miner
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "while ! nc -z 127.0.0.1 ${genesis_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "while ! nc -z 127.0.0.1 ${lotus_genesis_daemon_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "${lotus_base_dir}/scripts/create_miner-lotus.bash" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "lotus-storage-miner run --api=${genesis_miner_port} --nosync 2>&1 | tee -a ${lotus_base_dir}/miner.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner}" "lotus-storage-miner run --api=${lotus_genesis_miner_port} --nosync 2>&1 | tee -a ${lotus_base_dir}/miner.log" C-m
+
+# dump genesis miner multiaddr
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_miner_cli}" "lotus-storage-miner net listen | grep 127 > ${lotus_base_dir}/.genesis-miner-multiaddr" C-m
 
 # start faucet
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_faucet}" "while ! nc -z 127.0.0.1 ${genesis_miner_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_faucet}" "while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_lotus_genesis_faucet}" "${lotus_base_dir}/scripts/start_faucet-lotus.bash" C-m
 
 # start lotus client daemon
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_daemon}" "while [ ! -f ${lotus_base_dir}/dev.gen ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_daemon}" "lotus daemon --genesis=${lotus_base_dir}/dev.gen --bootstrap=false --api=${client_daemon_port} 2>&1 | tee -a ${lotus_base_dir}/client.log" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_daemon}" "lotus daemon --genesis=${lotus_base_dir}/dev.gen --bootstrap=false --api=${lotus_client_daemon_port} 2>&1 | tee -a ${lotus_base_dir}/client.log" C-m
 
 # start go-filecoin client daemon
 #
@@ -329,18 +339,37 @@ tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "wh
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin init --genesisfile=${lotus_base_dir}/dev.gen 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin daemon --swarmlisten=/ip4/127.0.0.1/tcp/${go_filecoin_client_daemon_port} --block-time=2s 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
 
-# go-filecoin client networks nodes
+# configure go-filecoin with drand
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${go_filecoin_client_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-multiaddr)" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin drand configure drand-test3.nikkolasg.xyz:5003" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin drand configure ${drand_host}:${drand_port}" C-m
 
-# lotus client hits the faucet (after networking two nodes)
+# connect go-filecoin client to genesis daemon
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 ${client_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "lotus net connect \$(cat ${lotus_base_dir}/.genesis-multiaddr)" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-daemon-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-daemon-multiaddr)" C-m
+
+# connect go-filecoin client to genesis miner
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-miner-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-miner-multiaddr)" C-m
+
+# connect lotus client to lotus genesis daemon
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_client_daemon_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-daemon-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "lotus net connect \$(cat ${lotus_base_dir}/.genesis-daemon-multiaddr)" C-m
+
+# connect lotus client to lotus genesis miner
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-miner-multiaddr ]; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "lotus net connect \$(cat ${lotus_base_dir}/.genesis-miner-multiaddr)" C-m
+
+# lotus client hits faucet for some funds
+#
 tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_base_dir}/scripts/hit_faucet-lotus.bash" C-m
 
@@ -355,5 +384,5 @@ tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_bas
 
 # select a window and view your handywork
 #
-tmux select-window -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}"
+tmux select-window -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}"
 tmux attach-session -t "${tmux_session}"
