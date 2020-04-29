@@ -219,6 +219,16 @@ msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" \$faucet/s
 lotus state wait-msg \$msg_cid
 EOF
 
+cat > "${go_filecoin_base_dir}/scripts/hit_faucet-go-filecoin.bash" <<EOF
+#!/usr/bin/env bash
+set -xe
+
+faucet="http://127.0.0.1:7777"
+owner=\$(go-filecoin address new | jq -r '.Address')
+msg_cid=\$(curl -D - -XPOST -F "sectorSize=2048" -F "address=\$owner" \$faucet/send | tail -1)
+go-filecoin message wait \$msg_cid
+EOF
+
 cat > "${lotus_base_dir}/scripts/propose_storage_deal-lotus.bash" <<EOF
 #!/usr/bin/env bash
 set -xe
@@ -226,6 +236,15 @@ set -xe
 cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 900 | head -n 1 > "${lotus_base_dir}/original-data.txt"
 lotus client import "${lotus_base_dir}/original-data.txt" > "${lotus_base_dir}/original-data.cid"
 lotus client deal \$(cat ${lotus_base_dir}/original-data.cid) t01000 0.000000000001 5
+EOF
+
+cat > "${go_filecoin_base_dir}/scripts/propose_storage_deal-go-filecoin.bash" <<EOF
+#!/usr/bin/env bash
+set -xe
+
+cat /dev/urandom | env LC_CTYPE=C tr -dc 'a-zA-Z0-9' | fold -w 900 | head -n 1 > "${go_filecoin_base_dir}/original-data.txt"
+go-filecoin client import "${go_filecoin_base_dir}/original-data.txt" | jq -r ".[\\"/\\"]" > "${go_filecoin_base_dir}/original-data.cid"
+cat "${go_filecoin_base_dir}/original-data.cid"
 EOF
 
 cat > "${lotus_base_dir}/scripts/retrieve_stored_file-lotus.bash" <<EOF
@@ -242,8 +261,76 @@ paste <(printf %s "\$(cat "${lotus_base_dir}/original-data.txt" | fold -s -w 50)
 diff "${lotus_base_dir}/original-data.txt" "${lotus_base_dir}/retrieved-data.txt" && echo "retrieved file matches stored file"
 EOF
 
+cat > "${lotus_base_dir}/scripts/client-cli-lotus.bash" <<EOF
+#!/usr/bin/env bash
+set -xe
+
+# connect lotus client to lotus genesis daemon
+#
+while ! nc -z 127.0.0.1 ${lotus_client_daemon_port} </dev/null; do sleep 5; done
+while [ ! -f ${lotus_base_dir}/.genesis-daemon-multiaddr ]; do sleep 5; done
+lotus net connect \$(cat ${lotus_base_dir}/.genesis-daemon-multiaddr)
+
+# connect lotus client to lotus genesis miner
+#
+while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done
+while [ ! -f ${lotus_base_dir}/.genesis-miner-multiaddr ]; do sleep 5; done
+lotus net connect \$(cat ${lotus_base_dir}/.genesis-miner-multiaddr)
+
+# lotus client hits faucet for some funds
+#
+while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done
+${lotus_base_dir}/scripts/hit_faucet-lotus.bash
+
+# propose a lotus-to-lotus storage deal
+#
+${lotus_base_dir}/scripts/propose_storage_deal-lotus.bash
+
+# retrieve data (from lotus) and be overjoyed
+#
+while ! lotus client list-deals | grep StorageDealActive; do sleep 5; done
+${lotus_base_dir}/scripts/retrieve_stored_file-lotus.bash
+
+EOF
+
+cat > "${go_filecoin_base_dir}/scripts/client-cli-go-filecoin.bash" <<EOF
+#!/usr/bin/env bash
+set -xe
+
+# configure go-filecoin with drand
+#
+while ! nc -z 127.0.0.1 ${go_filecoin_client_daemon_port} </dev/null; do sleep 5; done
+go-filecoin drand configure ${drand_host}:${drand_port}
+
+# connect go-filecoin client to genesis daemon
+#
+while ! nc -z 127.0.0.1 ${lotus_genesis_daemon_port} </dev/null; do sleep 5; done
+while [ ! -f ${lotus_base_dir}/.genesis-daemon-multiaddr ]; do sleep 5; done
+go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-daemon-multiaddr)
+
+# connect go-filecoin client to genesis miner
+#
+while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done
+while [ ! -f ${lotus_base_dir}/.genesis-miner-multiaddr ]; do sleep 5; done
+go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-miner-multiaddr)
+
+# go-filecoin client hits faucet for some funds
+#
+while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done
+${go_filecoin_base_dir}/scripts/hit_faucet-go-filecoin.bash
+
+# propose a go-filecoin-to-lotus storage deal
+#
+${go_filecoin_base_dir}/scripts/propose_storage_deal-go-filecoin.bash
+
+EOF
+
+chmod +x "${go_filecoin_base_dir}/scripts/build-go-filecoin.bash"
+chmod +x "${go_filecoin_base_dir}/scripts/client-cli-go-filecoin.bash"
+chmod +x "${go_filecoin_base_dir}/scripts/hit_faucet-go-filecoin.bash"
+chmod +x "${go_filecoin_base_dir}/scripts/propose_storage_deal-go-filecoin.bash"
 chmod +x "${lotus_base_dir}/scripts/build-lotus.bash"
-chmod +x "${lotus_base_dir}/scripts/build-go-filecoin.bash"
+chmod +x "${lotus_base_dir}/scripts/client-cli-lotus.bash"
 chmod +x "${lotus_base_dir}/scripts/create_genesis_block-lotus.bash"
 chmod +x "${lotus_base_dir}/scripts/create_miner-lotus.bash"
 chmod +x "${lotus_base_dir}/scripts/hit_faucet-lotus.bash"
@@ -339,50 +426,15 @@ tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "wh
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin init --genesisfile=${lotus_base_dir}/dev.gen 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_daemon}" "go-filecoin daemon --swarmlisten=/ip4/127.0.0.1/tcp/${go_filecoin_client_daemon_port} --block-time=2s 2>&1 | tee -a ${go_filecoin_base_dir}/client.log" C-m
 
-# configure go-filecoin with drand
+# run all lotus client commands
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${go_filecoin_client_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin drand configure ${drand_host}:${drand_port}" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_base_dir}/scripts/client-cli-lotus.bash" C-m
 
-# connect go-filecoin client to genesis daemon
+# run all go-filecoin client commands
 #
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-daemon-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-daemon-multiaddr)" C-m
-
-# connect go-filecoin client to genesis miner
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-miner-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "go-filecoin swarm connect \$(cat ${lotus_base_dir}/.genesis-miner-multiaddr)" C-m
-
-# connect lotus client to lotus genesis daemon
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_client_daemon_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-daemon-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "lotus net connect \$(cat ${lotus_base_dir}/.genesis-daemon-multiaddr)" C-m
-
-# connect lotus client to lotus genesis miner
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 ${lotus_genesis_miner_port} </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while [ ! -f ${lotus_base_dir}/.genesis-miner-multiaddr ]; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "lotus net connect \$(cat ${lotus_base_dir}/.genesis-miner-multiaddr)" C-m
-
-# lotus client hits faucet for some funds
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! nc -z 127.0.0.1 7777 </dev/null; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_base_dir}/scripts/hit_faucet-lotus.bash" C-m
-
-# propose a lotus-to-lotus storage deal
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_base_dir}/scripts/propose_storage_deal-lotus.bash" C-m
-
-# retrieve data (from lotus) and be overjoyed
-#
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "while ! lotus client list-deals | grep StorageDealActive; do sleep 5; done" C-m
-tmux send-keys -t "${tmux_session}:${tmux_window_lotus_client_cli}" "${lotus_base_dir}/scripts/retrieve_stored_file-lotus.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}" "${go_filecoin_base_dir}/scripts/client-cli-go-filecoin.bash" C-m
 
 # select a window and view your handywork
 #
-tmux select-window -t "${tmux_session}:${tmux_window_go_filecoin_client_cli}"
+tmux select-window -t "${tmux_session}:${tmux_window_lotus_client_cli}"
 tmux attach-session -t "${tmux_session}"
