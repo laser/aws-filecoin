@@ -15,14 +15,6 @@ main() {
     for arg in "$@"
     do
         case $arg in
-            --lotus-git-sha=*)
-            lotus_git_sha="${arg#*=}"
-            shift
-            ;;
-            --ec2-key-name=*)
-            ec2_key_name="${arg#*=}"
-            shift
-            ;;
             --env-name=*)
             env_name="${arg#*=}"
             shift
