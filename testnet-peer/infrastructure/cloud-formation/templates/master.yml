@@ -1,0 +1,46 @@
+Description: >
+  This template deploys a cluster of Filecoin nodes.
+
+Parameters:
+  EC2KeyName:
+    Description: AWS key pair name for connecting to EC2 instances
+    Type: AWS::EC2::KeyPair::KeyName
+  LotusGitSHA:
+    Description: Git SHA of lotus to build
+    Type: String
+  TemplateURLPrefix:
+    Description: A prefix used to construct HTTP URLs from which we download CloudFormation templates (contains trailing slash)
+    Type: String
+  TemplateS3Prefix:
+    Description: A prefix used to construct S3 URLs from which we construct AWS::Include snippets (contains trailing slash)
+    Type: String
+  PeeredMinerScriptURL:
+    Type: String
+
+Resources:
+  SecurityGroups:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateURLPrefix}security-groups.yml
+      Parameters:
+        EnvironmentName: !Ref AWS::StackName
+        VPC: !GetAtt Network.Outputs.VPC
+  Network:
+    Type: AWS::CloudFormation::Stack
+    Properties:
+      TemplateURL: !Sub ${TemplateURLPrefix}network.yml
+      Parameters:
+        EnvironmentName:    !Ref AWS::StackName
+        VpcCIDR:            10.0.0.0/16
+        PublicSubnet1CIDR:  10.0.10.0/22 # 1022 addresses
+  EC2InstancePeeredMiner00:
+    Fn::Transform:
+      Name: AWS::Include
+      Parameters:
+        Location: !Sub ${TemplateS3Prefix}stack-peered-miner.yml
+
+Outputs:
+  EC2InstancePeeredMinerIPs:
+    Value: !Join
+      - " "
+      - - !GetAtt EC2InstancePeeredMiner00.Outputs.EC2InstancePeeredMinerIP

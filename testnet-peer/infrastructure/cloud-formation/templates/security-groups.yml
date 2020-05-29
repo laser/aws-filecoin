@@ -1,0 +1,29 @@
+Description: >
+  This template contains the security groups required by our entire stack.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Choose which VPC the security groups should be deployed to
+
+Resources:
+  EC2InstancesSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      VpcId: !Ref VPC
+      GroupDescription: Access to the EC2 instances
+      SecurityGroupIngress:
+        # Allow access from anywhere to EC2 instances
+        - CidrIp: 0.0.0.0/0
+          IpProtocol: -1
+      Tags:
+        - Key: Name
+          Value: !Sub ${EnvironmentName}-EC2Instances
+
+Outputs:
+  EC2InstancesSecurityGroup:
+    Description: A reference to the security group for EC2 instances
+    Value: !Ref EC2InstancesSecurityGroup
