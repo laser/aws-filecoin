@@ -7,12 +7,39 @@ set -Exo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 main() {
-    local region=$1
-    local env_name=$2
-    local ec2_key_name=$3
-    local lotus_git_sha=$4
-    local config_bucket_name=$5
-    local config_key_prefix=$6
+    local region=""
+    local env_name=""
+    local ec2_key_name=""
+    local lotus_git_sha=""
+
+    # grab shell arguments
+    #
+    for arg in "$@"
+    do
+        case $arg in
+            --lotus-git-sha=*)
+            lotus_git_sha="${arg#*=}"
+            shift
+            ;;
+            --ec2-key-name=*)
+            ec2_key_name="${arg#*=}"
+            shift
+            ;;
+            --env-name=*)
+            env_name="${arg#*=}"
+            shift
+            ;;
+            --region=*)
+            region="${arg#*=}"
+            shift
+            ;;
+            *)
+            other_args+=("$1")
+            shift # Remove generic argument from processing
+            ;;
+        esac
+    done
+
     local templates_stack_name="${env_name}-template-storage"
     local scripts_stack_name="${env_name}-scripts"
 
@@ -56,7 +83,7 @@ main() {
         --region "${region}" \
         --acl public-read \
         --delete \
-        ../../../scripts/ "s3://${scripts_stack_name}/scripts" || exit 1
+        ../../scripts/ "s3://${scripts_stack_name}/scripts" || exit 1
 
     # Create (or update) the stack
     #
@@ -68,11 +95,7 @@ main() {
         --parameter-overrides \
         TemplateS3Prefix="s3://${templates_stack_name}/infrastructure/cloud-formation/templates/" \
         TemplateURLPrefix="https://${templates_stack_name}.s3.amazonaws.com/infrastructure/cloud-formation/templates/" \
-        GenesisMinerScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/genesis-node.sh" \
         PeeredMinerScriptURL="https://${scripts_stack_name}.s3.amazonaws.com/scripts/peer-mining-node.sh" \
-        LotusGitSHA="${lotus_git_sha}" \
-        ConfigKeyPrefix="${config_key_prefix}" \
-        ConfigBucketName="${config_bucket_name}" \
         LotusGitSHA="${lotus_git_sha}" \
         EC2KeyName="${ec2_key_name}" || exit 1
 

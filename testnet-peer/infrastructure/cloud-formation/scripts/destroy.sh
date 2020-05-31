@@ -7,8 +7,29 @@ set -Exo pipefail
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 main() {
-    local region=$1
-    local env_name=$2
+    local region=""
+    local env_name=""
+
+    # grab shell arguments
+    #
+    for arg in "$@"
+    do
+        case $arg in
+            --env-name=*)
+            env_name="${arg#*=}"
+            shift
+            ;;
+            --region=*)
+            region="${arg#*=}"
+            shift
+            ;;
+            *)
+            other_args+=("$1")
+            shift # Remove generic argument from processing
+            ;;
+        esac
+    done
+
     local main_stack_name=${env_name}
     local template_storage_stack_name=${env_name}-template-storage
     local scripts_stack_name=${env_name}-scripts

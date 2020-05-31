@@ -1,0 +1,106 @@
+Description: >
+  This template configures an EC2 instance on which we run a daemon and a
+  storage miner.
+
+Parameters:
+  EnvironmentName:
+    Description: An environment name that will be prefixed to resource names
+    Type: String
+  KeyName:
+    Description: AWS key pair name for connecting to EC2 instances
+    Type: AWS::EC2::KeyPair::KeyName
+  LotusGitSHA:
+    Description: Git SHA of lotus to build
+    Type: String
+  PeeredMinerScriptURL:
+    Description: URL from which peer node configuration-script can be downloaded
+    Type: String
+  SecurityGroup:
+    Description: Security group ID for EC2 instance network interfaces
+    Type: AWS::EC2::SecurityGroup::Id
+  Subnet:
+    Description: Subnet ID for EC2 instance network interfaces
+    Type: AWS::EC2::Subnet::Id
+  VPC:
+    Type: AWS::EC2::VPC::Id
+    Description: Choose which VPC the security groups should be deployed to
+
+Resources:
+  EC2InstancePeeredMiner:
+    Type: AWS::EC2::Instance
+    Properties:
+      BlockDeviceMappings:
+        - DeviceName: /dev/sda1
+          Ebs:
+            VolumeSize: 500
+            VolumeType: gp2
+            DeleteOnTermination: true
+      ImageId: "ami-09ca8bd0cc0115bed"
+      InstanceType: "r5.4xlarge"
+      KeyName: !Ref KeyName
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: "true"
+          DeviceIndex: "0"
+          SubnetId: !Ref Subnet
+          GroupSet:
+            - !Ref SecurityGroup
+      UserData: !Base64
+        'Fn::Sub': |
+          Content-Type: multipart/mixed; boundary="//"
+          MIME-Version: 1.0
+
+          --//
+          Content-Type: text/cloud-config; charset="us-ascii"
+          MIME-Version: 1.0
+          Content-Transfer-Encoding: 7bit
+          Content-Disposition: attachment; filename="cloud-config.txt"
+
+          #cloud-config
+          cloud_final_modules:
+          - [scripts-user, always]
+
+          --//
+          Content-Type: text/x-shellscript; charset="us-ascii"
+          MIME-Version: 1.0
+          Content-Transfer-Encoding: 7bit
+          Content-Disposition: attachment; filename="userdata.txt"
+
+          #!/bin/bash
+
+          set -x
+
+          GO_VERSION=1.13.9
+
+          # Install packages needed for libfilcrypto
+          apt-get update && apt-get install -y --no-install-recommends \
+            g++ \
+            libc6-dev \
+            ocl-icd-opencl-dev \
+            jq \
+            pkg-config \
+            python \
+            make
+
+          # Install Golang
+          curl -sSL "https://golang.org/dl/go$GO_VERSION.linux-amd64.tar.gz" | tar -xz -C /usr/local/
+          chown -R ubuntu:ubuntu /usr/local/go
+          mkdir -p /home/ubuntu/go/bin
+          export GOPATH=/home/ubuntu/go
+          export PATH=$GOPATH/bin:/usr/local/go/bin:$PATH
+
+          # Set various paths in ubuntu user's .bashrc
+          echo "export GOPATH=/home/ubuntu/go" >> /home/ubuntu/.bashrc
+          echo "export XDG_CACHE_HOME=/home/ubuntu/.cache" >> /home/ubuntu/.bashrc
+          echo "PATH=$PATH:/usr/local/go/bin:$GOPATH/bin" >> /home/ubuntu/.bashrc
+
+          # Download node-configuring script
+          curl -L ${PeeredMinerScriptURL} -o /tmp/run.sh
+          chmod +x /tmp/run.sh
+
+          # Run config script
+          GOPATH=/home/ubuntu/go PATH=$PATH:/usr/local/go/bin:/home/ubuntu/go/bin XDG_CACHE_HOME=/home/ubuntu/.cache /tmp/run.sh --lotus-git-sha=${LotusGitSHA}
+          --//
+Outputs:
+  EC2InstancePeeredMinerIP:
+    Description: IP Address for EC2 instance
+    Value: !GetAtt EC2InstancePeeredMiner.PublicIp

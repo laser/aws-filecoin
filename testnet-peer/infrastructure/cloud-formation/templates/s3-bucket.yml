@@ -1,0 +1,11 @@
+Parameters:
+  BucketName:
+    Description: The name of the bucket used to store things which will be publicly accessible
+    Type: String
+
+Resources:
+  S3Bucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      AccessControl: PublicRead
+      BucketName: !Ref BucketName
