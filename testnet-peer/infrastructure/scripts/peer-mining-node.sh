@@ -12,11 +12,13 @@ deps=(printf paste jq python nc)
 faucet_url="https://faucet.testnet.filecoin.io"
 lotus_git_sha=""
 other_args=()
+publish_port=$(free_port)
 storageminer_port=$(free_port)
 tmux_session="lotus"
 tmux_window_cli="cli"
 tmux_window_daemon="daemon"
 tmux_window_miner="miner"
+tmux_window_publishstate="publish"
 tmux_window_tmp_setup="setup"
 
 # ensure that script dependencies are met
@@ -102,8 +104,23 @@ maddr=\$(curl "${faucet_url}/msgwaitaddr?cid=\${param[f]}" | jq -r '.addr')
 lotus-storage-miner init --actor=\$maddr --owner=\$owner
 EOF
 
+cat > "${base_dir}/scripts/publish_state.bash" <<EOF
+#!/usr/bin/env bash
+set -x
+
+public_ip=\$(curl -m 5 http://169.254.169.254/latest/meta-data/public-ipv4 || echo "127.0.0.1")
+daemon_multiaddr=\$(lotus net listen | grep 127 | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
+miner_multiaddr=\$(lotus-storage-miner net listen | grep 127 | sed -En "s/127\.0\.0\.1/\${public_ip}/p")
+miner_id=\$(lotus-storage-miner info | grep Miner | cut -d ' ' -f2)
+
+cd $(mktemp -d)
+printf '{"daemon_multiaddr": "%s", "miner_multiaddr": "%s", "miner_id": "%s"}' \$daemon_multiaddr \$miner_multiaddr \$miner_id > ./publish.json
+python -m SimpleHTTPServer ${publish_port}
+EOF
+
 chmod +x "${base_dir}/scripts/build.bash"
 chmod +x "${base_dir}/scripts/create_miner.bash"
+chmod +x "${base_dir}/scripts/publish_state.bash"
 
 # build various lotus binaries
 #
@@ -116,6 +133,7 @@ tmux set-environment -t "$tmux_session" base_dir "$base_dir"
 tmux new-window -t "$tmux_session" -n "$tmux_window_daemon"
 tmux new-window -t "$tmux_session" -n "$tmux_window_miner"
 tmux new-window -t "$tmux_session" -n "$tmux_window_cli"
+tmux new-window -t "$tmux_session" -n "$tmux_window_publishstate"
 tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 
 # ensure tmux sessions have identical environments
@@ -123,6 +141,7 @@ tmux kill-window -t "$tmux_session":"$tmux_window_tmp_setup"
 tmux send-keys -t "${tmux_session}:${tmux_window_daemon}" "source ${base_dir}/scripts/env.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "source ${base_dir}/scripts/env.bash" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "source ${base_dir}/scripts/env.bash" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_publishstate}" "source ${base_dir}/scripts/env.bash" C-m
 
 # run daemon
 #
@@ -143,3 +162,8 @@ tmux send-keys -t "${tmux_session}:${tmux_window_miner}" "lotus-storage-miner ru
 #
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "while ! nc -z 127.0.0.1 ${storageminer_port} </dev/null; do sleep 5; done" C-m
 tmux send-keys -t "${tmux_session}:${tmux_window_cli}" "lotus-storage-miner set-price 0.00000000049" C-m
+
+# publish state document via HTTP
+#
+tmux send-keys -t "${tmux_session}:${tmux_window_publishstate}" "while ! nc -z 127.0.0.1 ${storageminer_port} </dev/null; do sleep 5; done" C-m
+tmux send-keys -t "${tmux_session}:${tmux_window_publishstate}" "${base_dir}/scripts/publish_state.bash" C-m
